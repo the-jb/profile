@@ -38,7 +38,5 @@ In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language 
 
 # Links
 
-- site: [thejb.ai](https://thejb.ai)
 - github: [the-jb](https://github.com/the-jb)
-- publications: [Google Scholar](https://scholar.google.com/citations?user=SQYbgngAAAAJ)
 - email: [jb@thejb.net](mailto:jb@thejb.net)
