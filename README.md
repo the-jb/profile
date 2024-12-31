@@ -27,16 +27,16 @@ In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language 
 
 # Experience
 
-- Research Assistant, Algorithmic Intelligence Lab, KAIST. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html)) 
+- Research Assistant, *Algorithmic Intelligence Lab, KAIST*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html)) \
 *Jan '25 ~ Present*
 
-- AI Researcher, *Tanalysis*. 
+- AI Researcher, *Tanalysis*. \
 *Nov '23 ~ Dec '24* 
 
-- Master of Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/)) 
+- Master of Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/)) \
 *Sep '21 ~ Aug '23*
 
-- S/W Engineer, *Samsung Electronics*. 
+- S/W Engineer, *Samsung Electronics*. \
 *Feb '17 ~ Aug '19*
 
 ---
