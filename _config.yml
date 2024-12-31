@@ -1,6 +1,6 @@
 name: THEJB.AI
 author: JB
-description: "AI 논문 리뷰와 구현"
+description:
 
 url: https://thejb.ai
 img_baseurl: "https://img.thejb.ai"
@@ -9,9 +9,6 @@ link_icons:
   -
     icon: github-icon
     url: https://github.com/the-jb
-  - 
-    icon: blog-icon
-    url: https://blog.thejb.ai
   -
     icon: scholar-icon
     url: https://scholar.google.com/citations?user=SQYbgngAAAAJ
