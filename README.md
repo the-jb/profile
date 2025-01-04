@@ -1,4 +1,4 @@
-*JB is a dedicated AI researcher who delves deeply into understanding neural architectures modeled on human innate systems.*
+The **JB** is currently a prospective PhD student researching in the [Algorithmic Intelligence Lab](https://alinlab.kaist.ac.kr/) at KAIST, under the guidance of Professor [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html). JB delves into understanding deep learning through the lens of human cognitive systems. Before joining KAIST, JB led AI research for patent analysis at Tanalysis. JB obtained a Master’s degree in Artificial Intelligence from Yonsei University, where JB explored neural architectures and their foundation in formal language, advised by Professor [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/). Prior to the journey into AI research, JB worked as a software engineer at Samsung Electronics.
 
 ---
 
