@@ -1,4 +1,4 @@
-*JB is a dedicated AI researcher who delves deeply into understanding neural architectures modeled on human innate systems.*
+**JB** is currently a research assistant at the [Algorithmic Intelligence Lab](https://alinlab.kaist.ac.kr/) at the Korea Advanced Institute of Science and Technology (KAIST), under the guidance of Professor [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html). JB delves into the principles of deep learning through the lens of human cognitive systems, specifically focusing on how humans acquire, process, and apply knowledge. Before joining KAIST, JB led AI research for patent analysis at Tanalysis. JB obtained a Master’s Degree in Artificial Intelligence from Yonsei University, where JB explored neural architectures and their foundation in formal language, advised by Professor [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/). Prior to the journey into AI research, JB worked as a Software Engineer at Samsung Electronics.
 
 ---
 
@@ -17,7 +17,7 @@ Large language models (LLMs) achieve language comprehension through vast amounts
 
 # Publications
 
-*For further information, please refer to my [Google Scholar](https://scholar.google.com/citations?user=SQYbgngAAAAJ).*
+*For further information, please refer to [Google Scholar](https://scholar.google.com/citations?user=SQYbgngAAAAJ).*
 
 - **ATHENA: Mathematical Reasoning with Thought Expansion**. [[arXiv](https://arxiv.org/abs/2311.01036)] [[emnlp-23](https://aclanthology.org/2023.emnlp-main.1014/)] [[code](https://github.com/the-jb/athena-math)] \
 ***JB. Kim***, Hazel Kim, Joonghyuk Hahn, Yo-Sub Han. \
@@ -30,13 +30,13 @@ In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language 
 - Research Assistant, *Algorithmic Intelligence Lab, KAIST*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
   <em class="date" style="display: inline; white-space: nowrap;">Jan '25 ~ Present</em>
 
-- AI Researcher, *Tanalysis*.
+- AI Research Scientist, *Tanalysis*.
   <em class="date" style="display: inline; white-space: nowrap;">Nov '23 ~ Dec '24</em>
 
 - Master of Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
   <em class="date" style="display: inline; white-space: nowrap;">Sep '21 ~ Aug '23</em>
 
-- S/W Engineer, *Samsung Electronics*.
+- Software Engineer, *Samsung Electronics*.
   <em class="date" style="display: inline; white-space: nowrap;">Feb '17 ~ Aug '19</em>
 
 ---
