@@ -1,4 +1,4 @@
-**JB** is currently a research assistant at the [Algorithmic Intelligence Lab](https://alinlab.kaist.ac.kr/) at the Korea Advanced Institute of Science and Technology (KAIST), under the guidance of [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html). He delves into the true nature of deep learning through the lens of human cognitive systems, specifically focusing on how humans acquire, process, and apply knowledge. Before joining KAIST, JB led AI research for patent analysis and retrieval systems at Tanalysis. He obtained a Master’s Degree in Artificial Intelligence from Yonsei University, where he explored neural architectures and their foundation in formal language, advised by [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/). Prior to his journey into AI research, JB worked as a Software Engineer at Samsung Electronics.
+**JB** is currently a PhD student at [KAIST AI](https://gsai.kaist.ac.kr/), advised by [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html). He delves into the true nature of deep learning through the lens of human cognitive systems, specifically focusing on how humans acquire, process, and apply knowledge. Before joining KAIST, JB led AI research for patent analysis and retrieval at Tanalysis. He obtained a Master’s Degree in Artificial Intelligence from Yonsei University, where he studied neural architectures and their foundations in formal language under the guidance of [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/). Prior to his journey into AI research, JB worked as a software engineer at Samsung Electronics.
 
 ---
 
@@ -17,9 +17,7 @@ Large language models (LLMs) achieve language comprehension through vast amounts
 
 # Publications
 
-*For further information, please refer to [Google Scholar](https://scholar.google.com/citations?user=SQYbgngAAAAJ).*
-
-- **ATHENA: Mathematical Reasoning with Thought Expansion**. [[arXiv](https://arxiv.org/abs/2311.01036)] [[emnlp-23](https://aclanthology.org/2023.emnlp-main.1014/)] [[code](https://github.com/the-jb/athena-math)] \
+- [**ATHENA: Mathematical Reasoning with Thought Expansion**](https://aclanthology.org/2023.emnlp-main.1014/). [[arXiv](https://arxiv.org/abs/2311.01036)] [[code](https://github.com/the-jb/athena-math)] \
 ***JB. Kim***, Hazel Kim, Joonghyuk Hahn, Yo-Sub Han. \
 In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing* (EMNLP 2023), 16315–16327, 2023
 
@@ -27,19 +25,14 @@ In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language 
 
 # Experience
 
-- Research Assistant, *Algorithmic Intelligence Lab, KAIST*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
-  <em class="date" style="display: inline; white-space: nowrap;">Jan '25 ~ Present</em>
+- Ph.D. Student, *Korea Advanced Institute of Science and Technology*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
+  <p class="date" style="display: inline; white-space: nowrap;">'25 ~ Present</p>
 
-- AI Research Scientist, *Tanalysis*.
-  <em class="date" style="display: inline; white-space: nowrap;">Nov '23 ~ Dec '24</em>
+- Research Scientist, *Tanalysis*.
+  <p class="date" style="display: inline; white-space: nowrap;">'23 ~ '24</p>
 
 - Master of Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
-  <em class="date" style="display: inline; white-space: nowrap;">Sep '21 ~ Aug '23</em>
+  <p class="date" style="display: inline; white-space: nowrap;">'21 ~ '23</p>
 
 - Software Engineer, *Samsung Electronics*.
-  <em class="date" style="display: inline; white-space: nowrap;">Feb '17 ~ Aug '19</em>
-
----
-
-# Contact
-- Email: jb@thejb.net
+  <p class="date" style="display: inline; white-space: nowrap;">'17 ~ '19</p>
