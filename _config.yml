@@ -12,19 +12,6 @@ link_icons:
     icon: scholar-icon
     url: https://scholar.google.com/citations?user=SQYbgngAAAAJ
 
-
-permalink: /:title/
-
-kramdown:
-  input: GFM
-  smart_quotes: ["apos", "apos", "quot", "quot"]
-  syntax_highlighter: rouge
-  syntax_highlighter_opts:
-    css_class: ''
-    # line_numbers: true
-    default_lang: python
-    guess_lang: true
-
 remote_theme: "the-jb/pages-theme"
 
 defaults:
