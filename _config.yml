@@ -6,10 +6,10 @@ img_baseurl: "https://img.thejb.ai"
 
 link_icons:
   -
-    icon: github-icon
+    icon: /github.svg
     url: https://github.com/the-jb
   -
-    icon: scholar-icon
+    icon: /scholar.svg
     url: https://scholar.google.com/citations?user=SQYbgngAAAAJ
 
 remote_theme: "the-jb/pages-theme"
