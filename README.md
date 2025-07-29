@@ -4,14 +4,14 @@
 
 # Research Interests
 
-- **Designing Neural Architectures Modeled on Human Cognitive Systems** \
-Cognitive systems play a pivotal role in advancing neural architectures for perception, cognition and reasoning. Research aims to reach optimal neural architectures by aligning them with human cognition.
+- **Neural Architectures Aligned with Human Cognition** \
+Cognitive systems play a pivotal role in advancing neural architectures for perception, cognition and reasoning. His research aims to discover optimal neural architectures by aligning them with cognitive principles.
 
-- **Advancing Knowledge Access to Deep Models** \
-Despite the vast knowledge stored in deep models, accessing and leveraging those knowledge remains a challenge. Research encompasses broad spectrum of knowledge for neural models, from information retrieval to understanding dynamics of complex reasoning.
+- **Knowledge Representation in Neural Models** \
+Despite the vast knowledge stored in deep models, accessing and leveraging this knowledge remains a challenge. His research focuses on how knowledge can be represented, accessed, and modified within neural models.
 
-- **Deep Learning for Language Acquisition with Minimal Data** \
-Large language models (LLMs) achieve language comprehension through vast amounts of data, whereas humans can acquire language from only a small amount of experience, known as the "poverty of the stimulus" argument. Research seeks deep learning methods that can effectively learn language with limited data by leveraging linguistic features.
+- **Deep Learning under the Poverty of the Stimulus** \
+Large language models achieve language comprehension through vast amounts of data, while humans acquire language from only a small amount of experience. His research investigates mechanisms within deep learning that support generalization from limited linguistic exposure.
 
 ---
 
