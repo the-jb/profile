@@ -25,13 +25,13 @@ In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language 
 
 # Experience
 
-- Ph.D. Student, *Korea Advanced Institute of Science and Technology*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
+- Ph.D. Student in Artificial Intelligence, *Korea Advanced Institute of Science and Technology*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
   <p class="date" style="display: inline; white-space: nowrap;">'25 ~ Present</p>
 
 - Research Scientist, *Tanalysis*.
   <p class="date" style="display: inline; white-space: nowrap;">'23 ~ '24</p>
 
-- Master of Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
+- M.S. in Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
   <p class="date" style="display: inline; white-space: nowrap;">'21 ~ '23</p>
 
 - Software Engineer, *Samsung Electronics*.
