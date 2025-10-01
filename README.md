@@ -17,8 +17,12 @@ Large language models achieve language comprehension through vast amounts of dat
 
 # Publications
 
+- **Scalable and Robust LLM Unlearning by Correcting Responses with Retrieved Exclusions** [[arXiv]](https://arxiv.org/abs/2509.25973) \
+***Junbeom Kim***, Kyuyoung Kim, Jihoon Tack, Dongha Lim, Jinwoo Shin
+
+
 - [**ATHENA: Mathematical Reasoning with Thought Expansion**](https://aclanthology.org/2023.emnlp-main.1014/). [[arXiv](https://arxiv.org/abs/2311.01036)] [[code](https://github.com/the-jb/athena-math)] \
-***JB. Kim***, Hazel Kim, Joonghyuk Hahn, Yo-Sub Han. \
+***JB Kim***, Hazel Kim, Joonghyuk Hahn, Yo-Sub Han. \
 In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing* (EMNLP 2023), 16315–16327, 2023
 
 ---
