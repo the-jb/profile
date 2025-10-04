@@ -4,14 +4,16 @@
 
 # Research Interests
 
-- **Neural Architectures Aligned with Human Cognition** \
-Cognitive systems play a pivotal role in advancing neural architectures for perception, cognition and reasoning. His research aims to discover optimal neural architectures by aligning them with cognitive principles.
+JB's research focuses on how cognitive principles can advance deep learning toward genuine artificial intelligence. Specifically, his research involves:
 
-- **Knowledge Representation in Neural Models** \
-Despite the vast knowledge stored in deep models, accessing and leveraging this knowledge remains a challenge. His research focuses on how knowledge can be represented, accessed, and modified within neural models.
+- **Deep learning under the *Poverty of the Stimulus*** \
+Unlike humans, who acquire knowledge from only a small amount of experience, today’s large models rely on massive data. His research aims to bridge this gap by seeking optimal learning algorithms that enable models to understand the world from limited exposure.
 
-- **Deep Learning under the Poverty of the Stimulus** \
-Large language models achieve language comprehension through vast amounts of data, while humans acquire language from only a small amount of experience. His research investigates mechanisms within deep learning that support generalization from limited linguistic exposure.
+- **Neural architectures grounded in human cognition** \
+To emulate the sophistication of human intelligence, neural architectures should be fundamentally aligned with human cognitive systems. His research draws on insights from cognitive science to explore foundational neural architectures that model human thought.
+
+- **Knowledge representation in deep neural models** \
+Despite the vast knowledge encoded in deep models, accessing and leveraging such knowledge remains a challenge. His research investigates how knowledge can be represented, accessed, and modified within deep neural models.
 
 ---
 
