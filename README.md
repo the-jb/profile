@@ -20,25 +20,28 @@ Despite the vast knowledge encoded in deep models, accessing and leveraging such
 # Publications
 
 - **Scalable and Robust LLM Unlearning by Correcting Responses with Retrieved Exclusions**. [[arXiv](https://arxiv.org/abs/2509.25973)] \
-**Junbeom Kim**, Kyuyoung Kim, Jihoon Tack, Dongha Lim, Jinwoo Shin
+**Junbeom Kim**, Kyuyoung Kim, Jihoon Tack, Dongha Lim, Jinwoo Shin \
+  *Preprint*
 
 
 - [**ATHENA: Mathematical Reasoning with Thought Expansion**](https://aclanthology.org/2023.emnlp-main.1014/). [[arXiv](https://arxiv.org/abs/2311.01036)] [[code](https://github.com/the-jb/athena-math)] \
 **JB Kim**, Hazel Kim, Joonghyuk Hahn, Yo-Sub Han. \
-In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing* (EMNLP 2023), 16315–16327, 2023
+  In *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing* (EMNLP 2023), 16315–16327, 2023
 
 ---
 
 # Experience
 
-- Ph.D. in Artificial Intelligence, *KAIST*. (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
-  <p class="date" style="display: inline; white-space: nowrap;">'25 ~ Present</p>
+- **Ph.D. in Artificial Intelligence, [KAIST](https://kaist.ac.kr/).
+  <span class="date" style="display: unset; white-space: nowrap;">'25 ~ Present</span>** \
+  (Advisor: [Jinwoo Shin](https://alinlab.kaist.ac.kr/shin.html))
 
 - Research Scientist, *Tanalysis*.
-  <p class="date" style="display: inline; white-space: nowrap;">'23 ~ '24</p>
+  <span class="date" style="display: unset; white-space: nowrap;">'23 ~ '24</span>
 
-- M.S. in Artificial Intelligence, *Yonsei University*. (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
-  <p class="date" style="display: inline; white-space: nowrap;">'21 ~ '23</p>
+- M.S. in Artificial Intelligence, [Yonsei University](https://www.yonsei.ac.kr/).
+  <span class="date" style="display: unset; white-space: nowrap;">'21 ~ '23</span> \
+  (Advisor: [Yo-Sub Han](https://toc.yonsei.ac.kr/~emmous/))
 
-- Software Engineer, *Samsung Electronics*.
-  <p class="date" style="display: inline; white-space: nowrap;">'17 ~ '19</p>
+- Software Engineer, [Samsung Electronics](https://www.samsung.com/).
+  <span class="date" style="display: unset; white-space: nowrap;">'17 ~ '19</span>
