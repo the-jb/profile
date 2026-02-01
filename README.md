@@ -7,7 +7,7 @@
 JB's research focuses on how cognitive principles can advance deep learning toward genuine artificial intelligence. Specifically, his research involves:
 
 - **Multimodality from a cognitive perspective** \
-Humans effortlessly integrate information across multiple senses to perceive and reason about the world. His research explores how cognitive principles of multimodal integration can inform the design of multimodal models.
+Humans understand the entire world through multiple senses, yet current models process modalities separately. His research explores how human cognition can inform the design of unified multimodal models.
 
 - **Deep learning under the *Poverty of the Stimulus*** \
 Unlike humans, who acquire knowledge from only a small amount of experience, today’s large models rely on massive data. His research aims to bridge this gap by seeking optimal learning algorithms that enable models to understand the world from limited exposure.
