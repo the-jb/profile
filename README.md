@@ -19,8 +19,10 @@ Despite the vast knowledge encoded in deep models, accessing and leveraging such
 
 # Publications
 
-- **HyperCLOVA X Technical Reports** (Omni 8B [[model](https://huggingface.co/naver-hyperclovax/HyperCLOVAX-SEED-Omni-8B)] [[arXiv](https://arxiv.org/abs/2601.01792)], Think 32B [[model](https://huggingface.co/naver-hyperclovax/HyperCLOVAX-SEED-Think-32B)] [[arXiv](https://arxiv.org/abs/2601.03286)]). \
-NAVER Cloud HyperCLOVA X Team
+- **HyperCLOVA X 8B Omni**. [[arXiv](https://arxiv.org/abs/2601.01792)] [[model](https://huggingface.co/naver-hyperclovax/HyperCLOVAX-SEED-Omni-8B)] \
+  **HyperCLOVA X 32B Think**. [[arXiv](https://arxiv.org/abs/2601.03286)] [[model](https://huggingface.co/naver-hyperclovax/HyperCLOVAX-SEED-Think-32B)] \
+  NAVER Cloud HyperCLOVA X Team \
+  *Technical Reports*
 
 - **Scalable and Robust LLM Unlearning by Correcting Responses with Retrieved Exclusions**. [[arXiv](https://arxiv.org/abs/2509.25973)] \
 **Junbeom Kim**, Kyuyoung Kim, Jihoon Tack, Dongha Lim, Jinwoo Shin \
