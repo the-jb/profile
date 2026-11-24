@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Integral: Let Vision-Language Models Generate Images through Their Representations</title>
+  <meta name="description" content="Integral explores how to leverage pretrained VLM knowledge for image generation through a shared visual representation space.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Integral: Let Vision-Language Models Generate Images through Their Representations">
+  <meta property="og:description" content="Can representations learned for multimodal understanding also be used for image generation?">
+  <meta property="og:url" content="https://thejb.ai/integral">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400..700;1,400..700&family=Young+Serif&display=swap">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="col">
+    <a class="home" href="https://thejb.ai/" aria-label="THE JB, home"><img src="https://img.thejb.ai/jb.png" alt="THE JB"></a>
+    <p class="brand"><span class="name">Integral</span></p>
+    <h1>Let Vision-Language Models Generate Images through Their Representations</h1>
+
+    <p class="authors">
+      <span><a href="https://thejb.ai/">JB Kim</a><sup>1,2,*</sup></span>
+      <span><a href="https://rootyjeon.github.io/">Byungwoo Jeon</a><sup>2</sup></span>
+      <span><a href="https://kyungmnlee.github.io/">Kyungmin Lee</a><sup>2</sup></span>
+      <span>Hyeonmo Kang<sup>2</sup></span>
+      <span><a href="https://cbokpark.github.io/">Cheonbok Park</a><sup>1,2</sup></span>
+      <span>Shinyoung Joo<sup>1</sup></span>
+      <span><a href="https://alinlab.kaist.ac.kr/shin.html">Jinwoo Shin</a><sup>2,&dagger;</sup></span>
+      <span><a href="https://penpaperkeycode.github.io/">Jeonghoon Kim</a><sup>1,2,&dagger;</sup></span>
+    </p>
+    <p class="affiliations"><sup>1</sup>NAVER Cloud &nbsp; <sup>2</sup>KAIST</p>
+    <p class="notes"><sup>*</sup>Work done during the NAVER Cloud Residency Program &nbsp; <sup>&dagger;</sup>Corresponding authors</p>
+
+    <!-- TODO: code and model URLs. -->
+    <p class="links">
+      <a href="https://arxiv.org/abs/2611.31237">Paper</a>
+      <span class="soon">Code</span>
+      <span class="soon">Model</span>
+      <a href="#resources">BibTeX</a>
+    </p>
+
+    <p class="claim">Can representations learned for multimodal understanding also be used for image generation?</p>
+  </div>
+
+  <div class="col wide">
+    <div class="showcase">
+      <figure>
+        <img src="https://img.thejb.ai/integral/cat-tshirt.jpg" alt="Generated image: a cat wearing a white T-shirt that reads Integral">
+        <figcaption>
+          <b>Text-to-image generation</b>
+          &ldquo;A photograph of a cat wearing a white T-shirt with the word &lsquo;Integral&rsquo; printed across the chest in bold black capital letters.&rdquo;
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="https://img.thejb.ai/integral/mount-fuji.jpg" alt="Generated image: Mount Fuji above a city">
+        <figcaption>
+          <b>Knowledge-intensive generation</b>
+          &ldquo;The mountain most closely associated with the country where Tokyo is located&rdquo;
+        </figcaption>
+      </figure>
+      <figure class="double">
+        <div class="pair">
+          <img src="https://img.thejb.ai/integral/mask-input.jpg" alt="Input: a plain white and red fox mask">
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <img src="https://img.thejb.ai/integral/mask-output.jpg" alt="Edited: an ornate golden Venetian carnival mask">
+        </div>
+        <figcaption>
+          <b>Knowledge-intensive editing</b>
+          &ldquo;Replace the plain mask in the image with the ornate mask worn at the Venetian Carnival&rdquo;
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="col">
+    <p class="lede">
+      <span class="name">Integral</span> explores how to leverage pretrained VLM knowledge for image
+      generation through a shared visual representation space.
+    </p>
+
+    <figure class="fig m">
+      <div class="anim-box overview">
+        <iframe class="anim" src="static/anim/overview.html" title="Animation of the overview of Integral. Abstraction Fusion builds visual tokens from the vision encoder of a pretrained vision-language model. The model reads these tokens for understanding, and Block-wise MoT generates tokens in the same space."></iframe>
+      </div>
+      <figcaption>Overview of <span class="name">Integral</span>.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<main>
+
+  <div class="part">
+    <p class="part-label">Part I &middot; How can we share?</p>
+    <p class="part-title">Constructing Shared Visual Representations</p>
+  </div>
+
+  <section id="hypothesis">
+    <div class="col">
+      <p class="eyebrow">Motivation</p>
+      <h2>Why Share Visual Representations?</h2>
+
+      <p>
+        Many unified multimodal models encode visual knowledge for understanding and generation through
+        separate experts modeling different visual representation spaces. However, this representational
+        heterogeneity can make knowledge sharing between these experts challenging.
+      </p>
+    </div>
+
+    <div class="col wide">
+      <figure class="reps">
+        <!-- Two drawings in the same layout: what the model reads above it, what it writes below, in
+             three columns (vision read, language, vision generated). Understanding covers the first
+             two columns and generation the last two, so they meet in the language column. Each
+             viewBox leaves 12 units beside its drawing; their widths (395 and 360) are the widths of
+             the two columns in the style sheet, so both are drawn at one scale. -->
+        <div class="rep">
+          <h4>Separate representations</h4>
+          <svg viewBox="9 0 395 216" role="img" aria-label="The VLM and a separate DiT or MoT model knowledge in different visual representations.">
+            <defs>
+              <g id="four-tokens">
+                <rect width="20" height="20" rx="4.5"/><rect x="24" width="20" height="20" rx="4.5"/>
+                <rect x="48" width="20" height="20" rx="4.5"/><rect x="72" width="20" height="20" rx="4.5"/>
+              </g>
+            </defs>
+            <text class="side" x="135" y="11">understanding</text>
+            <path class="span" d="M35,22 V17 H235 V22"/>
+            <text class="label" x="81" y="38">semantic tokens</text>
+            <text class="label" x="189" y="38">language</text>
+            <use href="#four-tokens" class="vlm-rep" x="35" y="45"/>
+            <use href="#four-tokens" class="text-rep" x="143" y="45"/>
+
+            <rect class="model" x="21" y="73" width="228" height="64" rx="12"/>
+            <text class="model-name" x="135" y="110">VLM</text>
+            <path class="link" d="M253,105 H262.5"/>
+            <path class="link-head" d="M270.5,105 l-6,-3.2 v6.4 z"/>
+            <rect class="model dit" x="272" y="73" width="120" height="64" rx="12"/>
+            <text class="model-name" x="332" y="110">DiT / MoT</text>
+
+            <use href="#four-tokens" class="text-rep" x="143" y="145"/>
+            <use href="#four-tokens" class="vae-rep" x="286" y="145"/>
+            <text class="label" x="189" y="180">language</text>
+            <text class="label" x="332" y="180">VAE latents</text>
+            <path class="span" d="M143,188 V193 H378 V188"/>
+            <text class="side" x="260.5" y="208">generation</text>
+          </svg>
+        </div>
+        <div class="rep">
+          <h4>Shared representation</h4>
+          <svg viewBox="30 0 360 216" role="img" aria-label="Understanding and generation are modeled in the same visual representation.">
+            <text class="side" x="156" y="11">understanding</text>
+            <path class="span" d="M56,22 V17 H256 V22"/>
+            <text class="label" x="102" y="38">shared tokens</text>
+            <text class="label" x="210" y="38">language</text>
+            <use href="#four-tokens" class="vlm-rep" x="56" y="45"/>
+            <use href="#four-tokens" class="text-rep" x="164" y="45"/>
+
+            <rect class="model" x="42" y="73" width="336" height="64" rx="12"/>
+            <text class="model-name" x="210" y="110">VLM</text>
+
+            <use href="#four-tokens" class="text-rep" x="164" y="145"/>
+            <use href="#four-tokens" class="vlm-rep" x="272" y="145"/>
+            <text class="label" x="210" y="180">language</text>
+            <text class="label" x="318" y="180">shared tokens</text>
+            <path class="span" d="M164,188 V193 H364 V188"/>
+            <text class="side" x="264" y="208">generation</text>
+          </svg>
+        </div>
+        <figcaption>
+          Separate visual representation spaces in existing approaches (left) and a shared visual token
+          space (right).
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="col">
+      <p class="statement">
+        Sharing visual representations enables effective generative learning that leverages the
+        multimodal knowledge encoded in pretrained VLMs.
+      </p>
+      <figure class="fig one-chart">
+        <img src="https://img.thejb.ai/integral/af-vs-flux.svg" alt="GenEval over 50K training steps for AF and FLUX.1-VAE. AF ends near 0.41 and FLUX.1-VAE near 0.18." loading="lazy">
+        <figcaption>
+          Sharing visual tokens (AF) achieves substantially better generative learning than separate
+          VAE latents (FLUX.1-VAE).
+        </figcaption>
+      </figure>
+      <p>
+        We investigate this by constructing a shared visual representation space through Abstraction
+        Fusion (AF). In particular, constructing a shared space for VLMs remains challenging, as
+        pretrained VLM representations often lack the fine-grained information required for image
+        reconstruction. Below, we identify a key bottleneck and introduce AF.
+      </p>
+    </div>
+  </section>
+
+  <section id="observation-1">
+    <div class="col">
+      <p class="eyebrow">Observation</p>
+      <h2>The Propagation Bottleneck</h2>
+
+      <h3>Challenge: Semantic abstraction vs. pixel reconstruction</h3>
+      <p>
+        Pretrained vision encoders progressively transform low-level visual information into high-level
+        semantic representations. While this abstraction supports visual understanding, the final-layer
+        representations often lack the fine-grained information required for image reconstruction.
+      </p>
+      <p>
+        One approach is to jointly train the vision encoder for reconstruction. However, this can degrade
+        its pretrained semantic capabilities.
+      </p>
+
+      <h3>Our hypothesis: The Propagation Bottleneck</h3>
+      <p class="statement">
+        When reconstruction relies on the final representation, the encoder may be encouraged to preserve
+        low-level information throughout its depth, interfering with progressive semantic abstraction.
+      </p>
+      <figure class="fig l">
+        <div class="anim-box">
+          <iframe class="anim" src="static/anim/bottleneck.html" loading="lazy" title="Animation of the propagation bottleneck. Under joint training, each encoder layer must both abstract and preserve low-level features, so low-level features propagate to deeper layers. Abstraction Fusion keeps the encoder frozen and fuses features across depths."></iframe>
+        </div>
+        <figcaption>
+          Joint training may encourage propagating low-level features to deeper layers, potentially
+          interfering with progressive semantic abstraction. Abstraction Fusion (AF) avoids this by fusing
+          features across depths.
+        </figcaption>
+      </figure>
+      <p>
+        This hypothesis predicts that deeper representations become more similar to the initial-layer
+        representation after joint reconstruction training.
+      </p>
+
+      <h3>Evidence 1: Changes in representation hierarchy</h3>
+      <p>
+        We measure layer-wise CKA between each encoder layer and the initial layer. After joint training,
+        deeper representations become substantially more similar to the initial-layer representation.
+      </p>
+      <figure class="fig one-chart">
+        <img src="https://img.thejb.ai/integral/cka.svg" alt="CKA similarity to the initial layer, by layer index. Joint training stays near 0.8 to 0.9 in deep layers, joint training with stronger semantic supervision falls to about 0.2, and the frozen pretrained encoder falls to about 0.05." loading="lazy">
+        <figcaption>
+          CKA similarity between each encoder layer and the initial layer. The frozen pretrained encoder is
+          the curve labeled AF.
+        </figcaption>
+      </figure>
+      <p>
+        This observation supports our hypothesis, although CKA does not directly measure information
+        propagation.
+      </p>
+
+      <h3>Evidence 2: Semantics&ndash;reconstruction trade-off</h3>
+      <p>
+        During joint training, stronger semantic supervision improves semantic preservation at the expense
+        of reconstruction fidelity, revealing a trade-off between the two. In contrast, AF avoids this
+        trade-off by maintaining the pretrained encoder's semantic abstraction while enabling image
+        reconstruction.
+      </p>
+      <figure class="fig two-charts">
+        <img src="https://img.thejb.ai/integral/joint-training.svg" alt="Cosine similarity to the VLM's visual tokens and reconstruction PSNR over 20K tokenizer training steps, for AF, the frozen encoder, joint training and joint training with stronger semantic supervision. Joint training reaches high PSNR with low similarity; stronger semantic supervision raises similarity and lowers PSNR." loading="lazy">
+        <figcaption>
+          Semantic similarity (left) and reconstruction PSNR (right) during tokenizer training.
+        </figcaption>
+      </figure>
+      <p>
+        Together, these results are consistent with the propagation bottleneck hypothesis and suggest that
+        preserving the pretrained encoder hierarchy while aggregating representations across depths is key
+        to resolving the semantics&ndash;reconstruction trade-off.
+      </p>
+    </div>
+  </section>
+
+  <section id="design">
+    <div class="col">
+      <p class="eyebrow">Method</p>
+      <h2><span class="name">Integral</span></h2>
+      <p>
+        <span class="name">Integral</span> extends a pretrained VLM with image generation through a
+        shared visual representation space. Abstraction Fusion constructs shared visual tokens, while
+        Block-wise MoT generates them using pretrained VLM representations.
+      </p>
+
+      <h3>Abstraction Fusion: Constructing shared visual representations</h3>
+      <p>
+        Abstraction Fusion (AF) takes the representations at every depth of the frozen vision encoder and
+        fuses them into visual tokens <math><mi>z</mi></math>:
+      </p>
+      <math display="block"><mi>z</mi><mo>=</mo><mi>AF</mi><mo stretchy="false">(</mo><msup><mi>h</mi><mrow><mo stretchy="false">(</mo><mn>0</mn><mo stretchy="false">)</mo></mrow></msup><mo>,</mo><mo>&hellip;</mo><mo>,</mo><msup><mi>h</mi><mrow><mo stretchy="false">(</mo><mi>L</mi><mo stretchy="false">)</mo></mrow></msup><mo stretchy="false">)</mo></math>
+      <p>The tokens play two roles:</p>
+      <math display="block"><mover><mi>s</mi><mo>^</mo></mover><mo>=</mo><msub><mi>g</mi><mi mathvariant="normal">sem</mi></msub><mo stretchy="false">(</mo><mi>z</mi><mo stretchy="false">)</mo><mo>,</mo><mspace width="2em"></mspace><mover><mi>x</mi><mo>^</mo></mover><mo>=</mo><msub><mi>g</mi><mi mathvariant="normal">pix</mi></msub><mo stretchy="false">(</mo><mi>z</mi><mo stretchy="false">)</mo></math>
+      <p>
+        A semantic projector <math><msub><mi>g</mi><mi mathvariant="normal">sem</mi></msub></math> aligns
+        <math><mi>z</mi></math> with the visual input space of the pretrained VLM, and a pixel decoder
+        <math><msub><mi>g</mi><mi mathvariant="normal">pix</mi></msub></math> reconstructs the image from the
+        same <math><mi>z</mi></math>.
+      </p>
+      <figure class="fig m">
+        <img src="https://img.thejb.ai/integral/abstraction-fusion.svg" alt="Abstraction Fusion: the outputs of all layers of the frozen vision encoder go through per-layer normalization and projection, self-attention and a linear pooler, then a VAE bottleneck producing tokens z, which feed a semantic projector and a pixel decoder." loading="lazy">
+        <figcaption>Abstraction Fusion. The vision encoder stays frozen.</figcaption>
+      </figure>
+      <p>
+        By effectively fusing features across the encoder hierarchy, AF reconstructs images at
+        32.2&nbsp;dB PSNR while the VLM retains 99.8% of its understanding performance.
+      </p>
+
+      <h3>Inspecting the learned representation</h3>
+      <p>We examine how AF utilizes representations across encoder depths.</p>
+    </div>
+
+    <div class="col wide">
+      <figure class="panels three">
+        <div>
+          <img src="https://img.thejb.ai/integral/layer-attention.svg" alt="Average cross-layer attention by group of encoder layers, on an axis from 0 to 100 percent: about 29 percent on layers 0 to 3, 16 percent on layers 12 to 15, 17 percent on layers 24 to 27, and 7 to 11 percent on the other groups." loading="lazy">
+          <p>(a) Cross-layer attention</p>
+        </div>
+        <div>
+          <img src="https://img.thejb.ai/integral/depth-psnr.svg" alt="Reconstruction PSNR as the deepest N layers are removed: from about 31.6 dB at N equals 4 down to about 27.3 dB at N equals 24." loading="lazy">
+          <p>(b) Removing the deepest <i>N</i> layers</p>
+        </div>
+        <div>
+          <img src="https://img.thejb.ai/integral/depth-semantic.svg" alt="Semantic similarity as the shallowest N layers are removed: from about 0.96 at N equals 4 down to about 0.86 at N equals 24." loading="lazy">
+          <p>(c) Removing the shallowest <i>N</i> layers</p>
+        </div>
+        <figcaption>
+          Contribution of features across encoder depth: (a) average attention over groups of layers,
+          (b) reconstruction quality and (c) semantic similarity as layers are removed.
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="col">
+      <p>
+        Notably, removing deeper layers reduces reconstruction quality, while removing shallower layers
+        degrades semantic similarity. These results highlight the contributions of different abstraction
+        levels to the shared representation.
+      </p>
+
+      <h3>Block-wise MoT: A lightweight generative extension</h3>
+      <p>
+        Generating images in a continuous latent space requires the VLM to model noisy latents
+        <math><msub><mi>z</mi><mi>t</mi></msub></math>, which it is not pretrained on. To this end, we introduce
+        <strong>Block-wise MoT</strong>, a lightweight generative module that denoises <math><msub><mi>z</mi><mi>t</mi></msub></math> by
+        leveraging pretrained VLM representations.
+      </p>
+      <p>
+        By incorporating adaLN-based timestep conditioning, our sparse block-wise design achieves
+        generation performance comparable to Full MoT at substantially lower computational cost.
+      </p>
+    </div>
+
+    <div class="col wide">
+      <figure class="panels mot">
+        <div>
+          <div class="both">
+            <img src="https://img.thejb.ai/integral/full-mot.svg" alt="Full MoT: every VLM layer is paired with a MoT layer." loading="lazy">
+            <img src="https://img.thejb.ai/integral/block-mot.svg" alt="Block-wise MoT: VLM layers are grouped into blocks with one MoT layer at each block boundary, followed by a flow head." loading="lazy">
+          </div>
+          <p>(a) Full MoT (left) and Block-wise MoT (right)</p>
+        </div>
+        <div>
+          <img src="https://img.thejb.ai/integral/full-vs-block-mot.svg" alt="GenEval over 50K text-to-image training steps for Full MoT and Block-wise MoT; the two curves stay close." loading="lazy">
+          <p>(b) Full vs. Block-wise MoT</p>
+        </div>
+        <div>
+          <img src="https://img.thejb.ai/integral/timestep-conditioning.svg" alt="GenEval over 50K training steps for Block-wise MoT with adaLN timestep conditioning and with the timestep embedding added to the input. The adaLN curve stays higher." loading="lazy">
+          <p>(c) Timestep conditioning</p>
+        </div>
+        <figcaption>
+          Block-wise MoT interacts with the VLM only at block boundaries (a), performs comparably to
+          Full MoT (b), and benefits from adaLN timestep conditioning (c).
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="part">
+    <p class="part-label">Part II &middot; Why does sharing matter?</p>
+    <p class="part-title">Leveraging VLM Knowledge for Generation</p>
+  </div>
+
+  <section id="knowledge">
+    <div class="col">
+      <p class="eyebrow">Qualitative results</p>
+      <h2>Generation through World Knowledge</h2>
+      <p>
+        <span class="name">Integral</span> effectively leverages the world knowledge encoded in
+        pretrained VLMs for knowledge-intensive image generation and editing.
+      </p>
+    </div>
+
+    <div class="col wide">
+      <div class="carousel">
+        <div class="carousel-tabs">
+          <button type="button" data-group="t2i" class="active">Text-to-image</button>
+          <button type="button" data-group="edit">Image editing</button>
+        </div>
+
+        <div class="slides" tabindex="0" role="group" aria-label="Knowledge-intensive examples">
+
+          <!-- Text-to-image: two examples per slide. -->
+          <div class="slide" data-group="t2i">
+            <div class="duo">
+              <figure>
+                <img src="https://img.thejb.ai/integral/soda-can.jpg" alt="Generated image: a soda can covered in water droplets" loading="lazy">
+                <figcaption>
+                  <span class="kind">Physics</span>
+                  <p><b>Prompt</b> A cold soda can left outside on a humid day, highlighting the state of the can</p>
+                  <p><b>Knowledge required</b> Knowing that humid air condenses on a cold surface.</p>
+                </figcaption>
+              </figure>
+              <figure>
+                <img src="https://img.thejb.ai/integral/permanganate.jpg" alt="Generated image: purple streams spreading through a glass of water" loading="lazy">
+                <figcaption>
+                  <span class="kind">Chemistry</span>
+                  <p><b>Prompt</b> Potassium permanganate crystal dissolving in water</p>
+                  <p><b>Knowledge required</b> Recognizing the characteristic purple color of dissolved potassium permanganate.</p>
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <div class="slide" data-group="t2i">
+            <div class="duo">
+              <figure>
+                <img src="https://img.thejb.ai/integral/bats-at-dusk.jpg" alt="Generated image: a wooden hut among orchard trees at dusk, its windows lit, with bats in the sky" loading="lazy">
+                <figcaption>
+                  <span class="kind">Time</span>
+                  <p><b>Prompt</b> The orchard watch hut when the first bats begin leaving the trees.</p>
+                  <p><b>Knowledge required</b> Knowing that bats leave their roosts at dusk.</p>
+                </figcaption>
+              </figure>
+              <figure>
+                <img src="https://img.thejb.ai/integral/frosted-leaf.jpg" alt="Generated image: a leaf covered in frost" loading="lazy">
+                <figcaption>
+                  <span class="kind">Biology</span>
+                  <p><b>Prompt</b> The state of a leaf after a cold night</p>
+                  <p><b>Knowledge required</b> Knowing that frost forms on a leaf on a freezing night.</p>
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <div class="slide" data-group="t2i">
+            <div class="duo">
+              <figure>
+                <img src="https://img.thejb.ai/integral/polar-bear.jpg" alt="Generated image: a polar bear standing on snow" loading="lazy">
+                <figcaption>
+                  <span class="kind">Animal</span>
+                  <p><b>Prompt</b> Show a large animal that lives in the arctic and subarctic, known for its thick white fur</p>
+                  <p><b>Knowledge required</b> Identifying the animal as a polar bear.</p>
+                </figcaption>
+              </figure>
+              <figure>
+                <img src="https://img.thejb.ai/integral/rice-terraces.jpg" alt="Generated image: green rice terraces with palm trees and a mountain behind" loading="lazy">
+                <figcaption>
+                  <span class="kind">Space</span>
+                  <p><b>Prompt</b> The stepped field landscape associated with the island where Ubud is located</p>
+                  <p><b>Knowledge required</b> Knowing that Ubud is on Bali, known for its terraced rice fields.</p>
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <!-- Image editing: one input and output pair per slide. -->
+          <figure class="slide" data-group="edit">
+            <div class="io">
+              <div class="cell"><img src="https://img.thejb.ai/integral/steak-input.jpg" alt="Input: a rare steak, cut open" loading="lazy"></div>
+              <span class="arrow" aria-hidden="true">&rarr;</span>
+              <div class="cell"><img src="https://img.thejb.ai/integral/steak-output.jpg" alt="Edited: the same steak cooked well-done" loading="lazy"></div>
+            </div>
+            <figcaption>
+              <span class="kind">Conceptual knowledge</span>
+              <p><b>Instruction</b> Change to the appearance of well-done.</p>
+              <p><b>Knowledge required</b> Knowing that well-done means cooked through, with no red left inside.</p>
+            </figcaption>
+          </figure>
+
+          <figure class="slide" data-group="edit">
+            <div class="io">
+              <div class="cell"><img src="https://img.thejb.ai/integral/sunflower-input.jpg" alt="Input: a closed sunflower bud" loading="lazy"></div>
+              <span class="arrow" aria-hidden="true">&rarr;</span>
+              <div class="cell"><img src="https://img.thejb.ai/integral/sunflower-output.jpg" alt="Edited: the same plant with an open sunflower" loading="lazy"></div>
+            </div>
+            <figcaption>
+              <span class="kind">Conceptual knowledge</span>
+              <p><b>Instruction</b> Modify to the appearance of this plant in full bloom</p>
+              <p><b>Knowledge required</b> Knowing that this bud opens into a sunflower.</p>
+            </figcaption>
+          </figure>
+
+          <figure class="slide" data-group="edit">
+            <div class="io">
+              <div class="cell"><img src="https://img.thejb.ai/integral/broom-input.jpg" alt="Input: a broom head without a handle" loading="lazy"></div>
+              <span class="arrow" aria-hidden="true">&rarr;</span>
+              <div class="cell"><img src="https://img.thejb.ai/integral/broom-output.jpg" alt="Edited: the same broom head with a wooden handle in its socket" loading="lazy"></div>
+            </div>
+            <figcaption>
+              <span class="kind">Factual knowledge</span>
+              <p><b>Instruction</b> Complete the broom handle for the broom.</p>
+              <p><b>Knowledge required</b> Knowing where a broom's handle attaches to its head.</p>
+            </figcaption>
+          </figure>
+
+          <figure class="slide" data-group="edit">
+            <div class="io">
+              <div class="cell"><img src="https://img.thejb.ai/integral/puppies-input.jpg" alt="Input: two puppies sitting in a field of orange flowers" loading="lazy"></div>
+              <span class="arrow" aria-hidden="true">&rarr;</span>
+              <div class="cell"><img src="https://img.thejb.ai/integral/puppies-output.jpg" alt="Edited: one puppy sitting in the same field" loading="lazy"></div>
+            </div>
+            <figcaption>
+              <span class="kind">Factual knowledge</span>
+              <p><b>Instruction</b> Remove one dog</p>
+              <p><b>Knowledge required</b> Counting the dogs in the image and leaving exactly one.</p>
+            </figcaption>
+          </figure>
+
+          <figure class="slide square" data-group="edit">
+            <div class="io">
+              <div class="cell"><img src="https://img.thejb.ai/integral/coffee-cup-input.jpg" alt="Input: a white paper coffee cup on a white background" loading="lazy"></div>
+              <span class="arrow" aria-hidden="true">&rarr;</span>
+              <div class="cell"><img src="https://img.thejb.ai/integral/coffee-cup-output.jpg" alt="Edited: the cup on a wooden table in front of a blurred cafe street, with the text Start here. at the top" loading="lazy"></div>
+            </div>
+            <figcaption>
+              <span class="kind">Procedural knowledge</span>
+              <p><b>Instruction, summarized</b> Make the cup the focus of a coffee advertisement: a light wooden tabletop, a blurred morning coffee shop street behind it, and the text "Start here." centered at the top.</p>
+              <details>
+                <summary>Full benchmark instruction</summary>
+                <p>Use the object in the image as the main visual focus, placing the object slightly below the center of the frame. The background should feature a blurred image of a morning coffee shop street scene with warm tones. Soft natural light should filter through glass windows, and the tabletop should have a light wood grain texture to create a daily commute atmosphere. The overall composition should be restrained and fresh, preserving the object's shadow and a sense of real space. Centered at the top of the image, place the English text: "Start here." Use a light sans-serif font in dark brown, with a simple and warm style suitable for specialty coffee brands, urban convenience beverage advertisements, or lifestyle visual projects.</p>
+              </details>
+              <p><b>Knowledge required</b> Carrying out a long brief step by step: keep the cup, place it, build the scene, add the text.</p>
+            </figcaption>
+          </figure>
+
+        </div>
+        <div class="carousel-nav">
+          <button type="button" class="prev" aria-label="Previous">&larr;</button>
+          <span class="count" aria-live="polite">1 / 3</span>
+          <button type="button" class="next" aria-label="Next">&rarr;</button>
+        </div>
+      </div>
+      <p class="caption center">
+        Text-to-image examples are from WISE-Verified, generated without explicit reasoning. Editing
+        examples are from KRIS-Bench.
+      </p>
+    </div>
+
+  </section>
+
+  <section id="observation-2">
+    <div class="col">
+      <p class="eyebrow">Analysis</p>
+      <h2>Effects of Representation Sharing</h2>
+      <p>
+        AF effectively leverages pretrained multimodal knowledge for image generation. Its strong
+        generation performance emerges under VLM conditioning, but drops under text-only LLM
+        conditioning. In contrast, FLUX.1-VAE shows little benefit from VLM conditioning.
+      </p>
+      <figure class="fig noted">
+        <!-- The chart on the left and notes on the right, in one coordinate system. The chart is
+             the paper's Fig. 6b drawn again for the page by tools/plot_conditioning.py (279.74 by
+             215.79 in its own units), shown here at 0.875 of that size so that it is as wide as the
+             page's other charts while the notes keep their type size. The script prints the 50K end
+             points of the four curves that the marks follow; times 0.875 they are x 232.53; VLM + AF
+             y 16.76, LLM + AF y 63.46, VLM + FLUX.1-VAE y 94.32, LLM + FLUX.1-VAE y 99.86. An arrow
+             runs between the two AF points, and a dotted leader starts between the two FLUX.1-VAE
+             points. -->
+        <svg viewBox="0 0 470 189" role="img" aria-labelledby="cond-title cond-desc">
+          <title id="cond-title">VLM versus LLM conditioning with AF and FLUX.1-VAE</title>
+          <desc id="cond-desc">GenEval over 50K training steps for AF and FLUX.1-VAE, each with VLM or text-only LLM conditioning. At 50K steps, VLM conditioning raises AF from 0.28 to 0.41, a gain of 0.13, and FLUX.1-VAE from 0.17 to 0.18, a gain of 0.01.</desc>
+          <image href="https://img.thejb.ai/integral/vlm-vs-llm.svg" width="244.77" height="188.82"/>
+          <path class="gain" d="M232.53,59 V24.6"/>
+          <path class="gain-head" d="M232.53,20.8 l-3,5.6 h6 z"/>
+          <path class="lead" d="M237.53,40.1 H263.5 M237.53,97.1 H263.5"/>
+          <text x="268.5" y="43.6">AF gains by leveraging VLM knowledge.</text>
+          <text x="268.5" y="100.6">VLM knowledge hardly helps FLUX.1-VAE.</text>
+        </svg>
+        <figcaption>VLM versus LLM conditioning with AF and FLUX.1-VAE, after 50K training steps.</figcaption>
+      </figure>
+      <p>
+        Integrating pretrained VLM representations into a shared visual space is key to leveraging
+        multimodal knowledge for image generation. Comparisons of AF across different variants further
+        support this finding.
+      </p>
+    </div>
+
+    <div class="col wide">
+      <figure class="panels two">
+        <div>
+          <img src="https://img.thejb.ai/integral/semantic-supervision.svg" alt="GenEval over 50K training steps for AF and for AF without semantic supervision; AF is higher throughout." loading="lazy">
+          <p>(a) AF with and without semantic supervision</p>
+        </div>
+        <div>
+          <img src="https://img.thejb.ai/integral/tokenizers.svg" alt="GenEval over 50K training steps for AF, SigLIP2-AF and FLUX.1-VAE. AF ends highest near 0.41, SigLIP2-AF near 0.31, FLUX.1-VAE near 0.18." loading="lazy">
+          <p>(b) Visual tokenizer comparison</p>
+        </div>
+        <figcaption>GenEval during 50K-step text-to-image training, under identical VLM conditioning.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="system">
+    <div class="col">
+      <p class="eyebrow">Benchmarks</p>
+      <h2>Unified Understanding and Generation</h2>
+      <p>
+        By sharing pretrained multimodal knowledge between understanding and generation,
+        <span class="name">Integral</span> achieves strong multimodal understanding and generation
+        performance with fewer model parameters.
+      </p>
+    </div>
+
+    <div class="col wide">
+      <figure class="chart">
+        <!-- Drawn by tools/draw_umm_chart.py (its svg() output, pasted here). Marker radius is 0.72 *
+             parameters in billions, so diameter is proportional to size. Emu3 and Harmon, which
+             are in the table below, are left out of the chart; the script says why. -->
+        <svg viewBox="0 0 760 470" role="img" aria-labelledby="chart-title chart-desc">
+          <title id="chart-title">Understanding and generation of unified multimodal models</title>
+          <desc id="chart-desc">Scatter plot of GenEval against MMMU for unified multimodal models, with marker diameter proportional to model size. Integral, at 9.8B parameters, is at MMMU 73.5 and GenEval 0.88, to the upper right of all other models.</desc>
+
+          <g class="grid">
+            <line x1="62" x2="742" y1="385.6" y2="385.6"/>
+            <line x1="62" x2="742" y1="263.7" y2="263.7"/>
+            <line x1="62" x2="742" y1="141.9" y2="141.9"/>
+            <line x1="62" x2="742" y1="20.0" y2="20.0"/>
+          </g>
+          <g class="axis">
+            <line x1="62" x2="742" y1="410" y2="410"/>
+            <line x1="62" x2="62" y1="20" y2="410"/>
+          </g>
+          <g class="ticks">
+            <text x="141.1" y="429" text-anchor="middle">40</text>
+            <text x="299.2" y="429" text-anchor="middle">50</text>
+            <text x="457.3" y="429" text-anchor="middle">60</text>
+            <text x="615.5" y="429" text-anchor="middle">70</text>
+            <text x="53" y="390.1" text-anchor="end">0.75</text>
+            <text x="53" y="268.2" text-anchor="end">0.80</text>
+            <text x="53" y="146.4" text-anchor="end">0.85</text>
+            <text x="53" y="24.5" text-anchor="end">0.90</text>
+          </g>
+          <text class="axis-title" x="402" y="458" text-anchor="middle">MMMU (multimodal understanding)</text>
+          <text class="axis-title" x="16" y="215" text-anchor="middle" transform="rotate(-90 16 215)">GenEval (image generation)</text>
+
+          <g class="point"><title>Janus-Pro, 7B parameters: MMMU 41.0, GenEval 0.80</title><circle cx="156.9" cy="263.7" r="5.0"/><text x="167.9" y="268.2">Janus-Pro <tspan>7B</tspan></text></g>
+          <g class="point"><title>Show-o2, 8.9B parameters: MMMU 48.9, GenEval 0.76</title><circle cx="281.8" cy="361.2" r="6.4"/><text x="294.2" y="365.7">Show-o2 <tspan>8.9B</tspan></text></g>
+          <g class="point"><title>MetaQuery-XL, 14B parameters: MMMU 58.6, GenEval 0.80 with rewritten prompts</title><circle cx="435.2" cy="263.7" r="10.1"/><text x="451.3" y="268.2">MetaQuery-XL <tspan>14B</tspan></text></g>
+          <g class="point"><title>BAGEL, 14B parameters: MMMU 55.3, GenEval 0.82</title><circle cx="383.0" cy="215.0" r="10.1"/><text x="399.1" y="219.5">BAGEL <tspan>14B</tspan></text></g>
+          <g class="point"><title>BLIP3-o, 8B parameters: MMMU 50.6, GenEval 0.84</title><circle cx="308.7" cy="166.3" r="5.8"/><text x="320.5" y="170.8">BLIP3-o <tspan>8B</tspan></text></g>
+          <g class="point"><title>Ming-UniVision, 18B parameters: MMMU 40.3, GenEval 0.85</title><circle cx="145.8" cy="141.9" r="13.0"/><text x="145.8" y="121.9" text-anchor="middle">Ming-UniVision <tspan>18B</tspan></text></g>
+          <g class="point"><title>UniAR, 11B parameters: MMMU 44.3, GenEval 0.85</title><circle cx="209.1" cy="141.9" r="7.9"/><text x="223.0" y="146.4">UniAR <tspan>11B</tspan></text></g>
+          <g class="point"><title>HYDRA, 7.8B parameters: MMMU 49.4, GenEval 0.86 with rewritten prompts</title><circle cx="289.7" cy="117.5" r="5.6"/><text x="301.3" y="122.0">HYDRA <tspan>7.8B</tspan></text></g>
+          <g class="point"><title>TUNA-2, 12B parameters: MMMU 50.7, GenEval 0.87</title><circle cx="310.3" cy="93.1" r="8.6"/><text x="324.9" y="97.6">TUNA-2 <tspan>12B</tspan></text></g>
+          <g class="point ours"><title>Integral, 9.8B parameters: MMMU 73.5, GenEval 0.88</title><circle cx="670.8" cy="68.8" r="7.1"/><text x="657.8" y="73.2" text-anchor="end"><tspan class="name">Integral</tspan> (ours) <tspan>9.8B</tspan></text></g>
+        </svg>
+        <figcaption>
+          Understanding (MMMU) against generation (GenEval) for unified models that report both. Circle
+          size indicates model size.
+        </figcaption>
+      </figure>
+
+      <div class="full-table">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2">Model</th>
+              <th rowspan="2">Params</th>
+              <th colspan="9" class="group">Visual understanding</th>
+              <th colspan="4" class="group">Image generation</th>
+            </tr>
+            <tr>
+              <th>POPE</th><th>MME-P</th><th>MME-C</th><th>MMB</th><th>SEED</th><th>SEED2+</th><th>MMStar</th><th>MMMU</th><th>OCRBench</th>
+              <th>GenEval</th><th>GenEval2</th><th>GenEval++</th><th>DPG</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Transfusion</td><td>7.3B</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>0.63</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+            <tr><td>Harmon</td><td>2.7B</td><td>87.6</td><td>1155</td><td>321</td><td>65.5</td><td>67.1</td><td>41.6</td><td>35.3</td><td>38.9</td><td>11.2</td><td>0.79</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+            <tr><td>Show-o2</td><td>8.9B</td><td>&ndash;</td><td>1621</td><td>&ndash;</td><td>&ndash;</td><td>69.8</td><td>61.3</td><td>56.6</td><td>48.9</td><td>32.4</td><td>0.76</td><td>&ndash;</td><td>&ndash;</td><td>86.14</td></tr>
+            <tr><td>UniTok</td><td>7B</td><td>83.2</td><td>1448</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>0.59</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+            <tr><td>Janus-Pro</td><td>7B</td><td>87.4</td><td>1567</td><td>260</td><td>79.2</td><td>72.1</td><td>56.3</td><td>48.3</td><td>41.0</td><td>59.0</td><td>0.80</td><td>&ndash;</td><td>0.246</td><td>84.19</td></tr>
+            <tr><td>MetaQuery-XL</td><td>14B</td><td>&ndash;</td><td>1685</td><td>&ndash;</td><td>83.5</td><td>76.9</td><td>&ndash;</td><td>&ndash;</td><td>58.6</td><td>&ndash;</td><td>0.80<sup>&dagger;</sup></td><td>&ndash;</td><td>&ndash;</td><td>82.05</td></tr>
+            <tr><td>BAGEL</td><td>14B</td><td>&ndash;</td><td>1687</td><td><b>701</b></td><td>85.0</td><td>78.5</td><td>71.9</td><td>&ndash;</td><td>55.3</td><td>73.3</td><td>0.82</td><td>23.1<sup>&sect;</sup></td><td>0.371</td><td>&ndash;</td></tr>
+            <tr><td>BLIP3-o 8B</td><td>8B</td><td>&ndash;</td><td>1683</td><td>647</td><td>83.5</td><td>77.5</td><td>&ndash;</td><td>&ndash;</td><td>50.6</td><td>&ndash;</td><td>0.84</td><td>&ndash;</td><td>&ndash;</td><td>81.60</td></tr>
+            <tr><td>Ming-UniVision</td><td>18B</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>56.8</td><td>&ndash;</td><td>40.3</td><td>72.4</td><td>0.85</td><td>&ndash;</td><td>&ndash;</td><td>82.12</td></tr>
+            <tr><td>UniAR</td><td>11B</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>44.3</td><td>83.3</td><td>0.85</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+            <tr><td>HYDRA</td><td>7.8B</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>82.4</td><td>75.5</td><td>&ndash;</td><td>62.3</td><td>49.4</td><td>57.7</td><td>0.86<sup>&dagger;</sup></td><td>&ndash;</td><td>&ndash;</td><td>86.40<sup>&dagger;</sup></td></tr>
+            <tr><td>TUNA-2</td><td>12B</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>61.1</td><td>&ndash;</td><td>50.7</td><td>79.7</td><td>0.87</td><td>&ndash;</td><td>&ndash;</td><td><b>86.54</b></td></tr>
+            <tr class="ours"><td><span class="name">Integral</span> (ours)</td><td>9.8B</td><td><b>89.6</b></td><td><b>1716</b></td><td>695</td><td><b>85.4</b></td><td><b>78.8</b></td><td><b>73.2</b></td><td><b>76.0</b></td><td><b>73.5</b></td><td><b>87.3</b></td><td><b>0.88</b></td><td><b>39.56</b><sup>&sect;</sup></td><td><b>0.743</b></td><td>84.76</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption center">
+        Comparison with unified multimodal models. <sup>&dagger;</sup>With rewritten prompts.
+        <sup>&sect;</sup>With chain-of-thought reasoning.
+      </p>
+    </div>
+  </section>
+
+  <section id="learned">
+    <div class="col">
+      <h2>What Have We Learned?</h2>
+      <ol class="learned">
+        <li>
+          <b>Multimodal knowledge acquired through understanding can also be leveraged for image generation.</b>
+          Pretrained VLMs provide a foundation for knowledge-intensive visual generation without learning
+          multimodal knowledge from scratch.
+        </li>
+        <li>
+          <b>Sharing visual representations is key to transferring this knowledge.</b>
+          A shared visual space allows generation to directly leverage the representations learned for
+          multimodal understanding.
+        </li>
+        <li>
+          <b>A key bottleneck between image reconstruction and semantic abstraction lies in the encoder layers' capacity for abstraction.</b>
+          Preserving fine-grained details across encoder depth can interfere with the progressive
+          abstraction of visual information.
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="resources">
+    <div class="col">
+      <h2>Resources</h2>
+      <!-- TODO: code and model URLs. -->
+      <p class="links left">
+        <a href="https://arxiv.org/abs/2611.31237">Paper</a>
+        <span class="soon">Code</span>
+        <span class="soon">Model</span>
+      </p>
+
+      <h3>BibTeX</h3>
+      <div class="bibtex">
+        <button type="button" class="copy" data-copy="bibtex-text">Copy</button>
+<pre id="bibtex-text">@article{kim2026integral,
+  title   = {Let Vision-Language Models Generate Images through
+             Their Representations},
+  author  = {Kim, JB and Jeon, Byungwoo and Lee, Kyungmin and Kang, Hyeonmo and
+             Park, Cheonbok and Joo, Shinyoung and Shin, Jinwoo and Kim, Jeonghoon},
+  journal = {arXiv preprint arXiv:2611.31237},
+  year    = {2026}
+}</pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  document.querySelectorAll('button.copy').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var text = document.getElementById(button.dataset.copy).textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        button.textContent = 'Copied';
+        setTimeout(function () { button.textContent = 'Copy'; }, 1500);
+      });
+    });
+  });
+
+  // Carousels: one slide per view, in groups (text-to-image, then image editing). The arrows move
+  // by one slide and the tabs jump to a group's first slide. Swiping and the keyboard scroll the
+  // same container, so the tabs, the counter and the arrows all follow the scroll position.
+  document.querySelectorAll('.carousel').forEach(function (carousel) {
+    var slides = carousel.querySelector('.slides');
+    var items = Array.prototype.slice.call(slides.children);
+    var tabs = Array.prototype.slice.call(carousel.querySelectorAll('.carousel-tabs button'));
+    var prev = carousel.querySelector('.prev');
+    var next = carousel.querySelector('.next');
+    var count = carousel.querySelector('.count');
+    var smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function current() {
+      return Math.round(slides.scrollLeft / slides.clientWidth);
+    }
+    function show(index) {
+      slides.scrollTo({ left: index * slides.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+    }
+    function firstOf(group) {
+      return items.findIndex(function (item) { return item.dataset.group === group; });
+    }
+    function update() {
+      var index = current();
+      var group = items[index].dataset.group;
+      var size = items.filter(function (item) { return item.dataset.group === group; }).length;
+      tabs.forEach(function (tab) { tab.classList.toggle('active', tab.dataset.group === group); });
+      count.textContent = (index - firstOf(group) + 1) + ' / ' + size;
+      prev.disabled = index === 0;
+      next.disabled = index === items.length - 1;
+    }
+
+    prev.addEventListener('click', function () { show(current() - 1); });
+    next.addEventListener('click', function () { show(current() + 1); });
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () { show(firstOf(tab.dataset.group)); });
+    });
+    slides.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  });
+</script>
+</body>
+</html>

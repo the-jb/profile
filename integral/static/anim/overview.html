@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview of Integral</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400..700&display=swap">
+<style>
+  html { background: #fff; font-family: "Google Sans", -apple-system, "Segoe UI", sans-serif; color: #1d1d1f; }
+  body { margin: 0; }
+  #stage { display: block; width: 100%; max-width: 760px; margin: 0 auto; cursor: pointer; }
+  #bar { display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 40px; max-width: 760px; margin: 0 auto; padding: 0 14px; opacity: 0; transition: opacity 0.2s; }
+  html:hover #bar, #bar:focus-within, body.paused #bar { opacity: 1; }
+  @media (hover: none) { #bar { opacity: 1; } }
+  #toggle { flex: none; width: 30px; height: 30px; padding: 7px; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+  #toggle:hover { background: #eee; }
+  #toggle svg { display: block; width: 16px; height: 16px; fill: #1d1d1f; }
+  #timeline { flex: 1; min-width: 0; margin: 0; accent-color: #1d1d1f; cursor: pointer; }
+  text { font-family: inherit; text-rendering: geometricPrecision; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 561 282" role="img" aria-label="Animation of the overview of Integral."></svg>
+<div id="bar">
+  <button id="toggle" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path id="toggleIcon"/></svg></button>
+  <input id="timeline" type="range" min="0" step="0.01" value="0" aria-label="Position in the animation">
+</div>
+<script>
+// The paper's overview figure (its wide form, tools/sources/overview-long.pdf) in motion. It
+// starts as that figure, whole, and ends as it. It plays once.
+//
+// The figure's panel is in two halves along a diagonal, "/": gray on the upper left, blue on the
+// lower right, each fading to white toward the diagonal. That diagonal is also what divides
+// understanding (upper left: the encoder, Abstraction Fusion, what the model reads) from
+// generation (lower right: what the model writes, Block-wise MoT). The model itself is over the
+// diagonal and belongs to both; it is never divided or faded.
+//
+// Understanding:
+// 1. The whole figure. On the page it does not stand still first: it starts at once.
+// 2. The word "understanding" gets darker (its color only), and the lower right of the diagonal
+//    fades back, the panel with it. In the same move everything that is made is cleared, on both
+//    sides. What generation makes: the language and the vision tokens the model writes go blank,
+//    their arrows go, Block-wise MoT goes faint; so when the lower right comes back, it comes back
+//    blank. What understanding makes: the encoder's layers and the vision tokens go blank, the
+//    arrows from the tokens into the model go, and Abstraction Fusion (its name and arrow) goes
+//    faint.
+// 3. "image" bounces once. Then one front moves at one speed, without a stop: up the encoder,
+//    whose color fills in behind it from the bottom; along the Abstraction Fusion arrow, which
+//    comes back strong the moment the encoder is full, and on which the front is a blue dot; and
+//    across the shared tokens, which fill in behind it. The arrows into the model come, moving
+//    down into place once.
+//
+// Generation, after a stop:
+// 5. The word "generation" gets darker and the lower right comes back, blank; the encoder and
+//    Abstraction Fusion fade back. What the model reads stays: generation is from language and
+//    from images.
+// 6. Language first: its arrow comes, moving into place, and the language fills in. Then the
+//    shared tokens: their arrow comes, moving into place; Block-wise MoT comes back strong and
+//    the dot goes through it; and the tokens come up out of noise, from blank, gradually.
+// 7. What was generated becomes what is read. After a stop, the tokens the model read go blank and
+//    their arrows go. Then the generated tokens, language and vision, leave their places and go
+//    around the model along its edge, in one line: left along the bottom, up its left side, and
+//    right along the top, into the places of the tokens the model reads. They turn with the way,
+//    so they arrive turned half around; that is why the generated vision tokens are drawn the
+//    other way round from the ones that are read (blue on the left), and arrive the same as them.
+//    Block-wise MoT goes with them as they leave, like their arrows and names.
+//    The view goes with the tokens, back to understanding: as they go, the panel's lower right
+//    and the word "generation" fade away, and then the panel's upper left and the word
+//    "understanding" come back, so the tokens arrive in the view they are read in. The encoder
+//    and Abstraction Fusion stay faint.
+// 8. After a stop, the whole figure comes back: both halves of the panel, the encoder and
+//    Abstraction Fusion, the arrows into the model, and everything the model writes. That is the
+//    figure it started as, and it starts again.
+//
+// The picture is a function of time: seek(t) draws time t on its own and stops the loop.
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('stage');
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+}
+function label(parent, x, y, text, attrs) {
+  const e = el('text', Object.assign({ x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, attrs), parent);
+  e.textContent = text;
+  return e;
+}
+const clamp = (v) => Math.max(0, Math.min(1, v));
+const smooth = (v) => { v = clamp(v); return v * v * (3 - 2 * v); };
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const rgb = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
+const mix = (a, b, p) => a.map((v, i) => v + (b[i] - v) * p);
+
+const INK = '#1d1d1f', BLUE = '#1155cc', GRAY = '#7f7f7f';
+// The encoder's layers, first (bottom) to last (top): top edge and color.
+const LAYER_Y = [183.8, 160.2, 136.4, 112.9, 89.1];
+const LAYER_COLOR = ['#d9e1ef', '#95b0e2', '#5081d8', '#2865d1', '#1155cc'].map(hex);
+const LAYER_X = 23, LAYER_S = 21.1, LAYER_OFF = hex('#e6e6e6');
+const TOKEN = 25.5, STEP = 28.6, TOKENS = 4, ROW = (TOKENS - 1) * STEP + TOKEN;
+const IN_Y = 47.8, OUT_Y = 221.3;
+const SHARED_IN_X = 113.2, LANG_X = 235.9, SHARED_OUT_X = 357.8;
+
+const defs = el('defs', {});
+// The diagonal goes through DIAGONAL, and ACROSS is the direction across it, toward the lower
+// right (a unit vector). across(d) is the point d units from the diagonal, that way.
+const DIAGONAL = [286, 139.8], ACROSS = [0.5002, 0.8659];
+const across = (d) => [DIAGONAL[0] + ACROSS[0] * d, DIAGONAL[1] + ACROSS[1] * d];
+// The two sides of the diagonal can be shown at different strengths: something is seen through a
+// mask that has one strength on the upper left and another on the lower right, passing from the
+// one to the other over the 24 units around the diagonal (where the panel is white). There are
+// two such masks, one for the panel in back and one for what is in front, because during
+// generation the panel's upper left fades while the tokens the model reads, in front of it, stay.
+function sidesMask(id) {
+  const fill = el('linearGradient', { id: id + 'Fill', gradientUnits: 'userSpaceOnUse',
+    x1: across(-12)[0], y1: across(-12)[1], x2: across(12)[0], y2: across(12)[1] }, defs);
+  const upperLeft = el('stop', { offset: 0, 'stop-color': '#fff' }, fill);
+  const lowerRight = el('stop', { offset: 1, 'stop-color': '#fff' }, fill);
+  const mask = el('mask', { id, maskUnits: 'userSpaceOnUse', x: -10, y: -10, width: 581, height: 302, style: 'mask-type: alpha' }, defs);
+  el('rect', { x: -10, y: -10, width: 581, height: 302, fill: `url(#${id}Fill)` }, mask);
+  return { upperLeft, lowerRight };
+}
+const backSides = sidesMask('backSides'), frontSides = sidesMask('frontSides');
+
+// In back: the panel, measured from the figure's own. Gray, opaque from 118 units on the upper
+// left of the diagonal and clear from 12; then blue, clear until 10 units on the lower right and
+// opaque from 120, a little deeper toward the corner.
+const back = el('g', { mask: 'url(#backSides)' });
+const PANEL = [[-118, '#f2f2f2', 1], [-12, '#f2f2f2', 0], [10, '#dfe6ee', 0], [120, '#dfe6ee', 1], [262, '#cddbe8', 1]];
+const panel = el('linearGradient', { id: 'panel', gradientUnits: 'userSpaceOnUse',
+  x1: across(-118)[0], y1: across(-118)[1], x2: across(262)[0], y2: across(262)[1] }, defs);
+for (const [d, color, opacity] of PANEL) el('stop', { offset: (d + 118) / 380, 'stop-color': color, 'stop-opacity': opacity }, panel);
+el('rect', { x: 0.7, y: 0.9, width: 560.2, height: 277.9, rx: 21, fill: 'url(#panel)' }, back);
+
+// The model with its white surround: whole all through, until everything goes at the end.
+const model = el('g', {});
+el('rect', { x: 90.2, y: 80.8, width: 397.5, height: 130.2, rx: 12, fill: '#fff' }, model);
+el('rect', { x: 101.7, y: 90.6, width: 377.9, height: 109.3, rx: 8, fill: '#e8e8e8' }, model);
+label(model, 290.7, 145, 'Vision-Language Model', { 'font-size': 18.1, fill: INK });
+
+// In front: everything else.
+const front = el('g', { mask: 'url(#frontSides)' });
+const group = () => el('g', {}, front);
+
+// An arrow of the figure, pointing down, from y0 to its tip at y1.
+function arrowDown(parent, x, y0, y1) {
+  const g = el('g', {}, parent);
+  el('path', { d: `M${x},${y0} V${y1 - 4}`, stroke: '#000', 'stroke-width': 1, fill: 'none' }, g);
+  el('path', { d: `M${x},${y1} l-2.6,-5.2 h5.2 z`, fill: '#000' }, g);
+  return g;
+}
+// The places of a row of four tokens: faint blanks, which show where a token is not.
+function tokenPlaces(parent, x0, y) {
+  const places = el('g', {}, parent);
+  for (let j = 0; j < TOKENS; j++) el('rect', { x: x0 + j * STEP, y, width: TOKEN, height: TOKEN, rx: 3.5, fill: '#fff', opacity: 0.55 }, places);
+  return places;
+}
+// A row of four tokens that can be shown up to a point from its left: the places, and the tokens,
+// behind a window whose width is set by reveal(part).
+function tokenRow(parent, id, x0, y, fill) {
+  const window_ = el('rect', { x: x0 - 1, y: y - 1, width: 0, height: TOKEN + 2 }, el('clipPath', { id }, defs));
+  const places = tokenPlaces(parent, x0, y);
+  const tokens = el('g', { 'clip-path': `url(#${id})` }, parent);
+  for (let j = 0; j < TOKENS; j++) el('rect', { x: x0 + j * STEP, y, width: TOKEN, height: TOKEN, rx: 3.5, fill }, tokens);
+  return { places, tokens, reveal: (part) => window_.setAttribute('width', (ROW + 2) * clamp(part)) };
+}
+// A shared token, as in the figure: from gray on its left to the blue of the last layer.
+const whole = el('linearGradient', { id: 'whole', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
+el('stop', { offset: 0, 'stop-color': '#d9d9d9' }, whole);
+el('stop', { offset: 0.92, 'stop-color': '#1155cc' }, whole);
+
+// A generated vision token: the same, turned half around (blue on its left).
+const turned = el('linearGradient', { id: 'turned', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
+el('stop', { offset: 0.08, 'stop-color': '#1155cc' }, turned);
+el('stop', { offset: 1, 'stop-color': '#d9d9d9' }, turned);
+
+// The vision encoder and the image under it.
+const encoder = group();
+el('rect', { x: 11.4, y: 79.3, width: 43.2, height: 137.8, rx: 5, fill: '#d9d9d9' }, encoder);
+// The layers blank, and over them the layers in their colors, behind a window that opens from the
+// bottom: encode(part) shows them up to that part of the way to the top.
+LAYER_Y.forEach((y) => el('rect', { x: LAYER_X, y, width: LAYER_S, height: LAYER_S, rx: 3, fill: rgb(LAYER_OFF) }, encoder));
+const ENCODER_BOTTOM = LAYER_Y[0] + LAYER_S, ENCODER_TOP = LAYER_Y[4];
+const encodedWindow = el('rect', { x: LAYER_X - 1, width: LAYER_S + 2 }, el('clipPath', { id: 'encoded' }, defs));
+const encodedLayers = el('g', { 'clip-path': 'url(#encoded)' }, encoder);
+LAYER_Y.forEach((y, k) => el('rect', { x: LAYER_X, y, width: LAYER_S, height: LAYER_S, rx: 3, fill: rgb(LAYER_COLOR[k]) }, encodedLayers));
+function encode(part) {
+  const top = ENCODER_BOTTOM + 1 - (ENCODER_BOTTOM - ENCODER_TOP + 2) * clamp(part);
+  encodedWindow.setAttribute('y', top);
+  encodedWindow.setAttribute('height', ENCODER_BOTTOM + 1 - top);
+}
+el('path', { d: 'M58.2,205 V96', stroke: '#000', 'stroke-width': 1, fill: 'none' }, encoder);
+el('path', { d: 'M58.2,91.1 l-2.6,5.4 h5.2 z', fill: '#000' }, encoder);
+label(encoder, 71.3, 150.1, 'vision encoder', { 'font-size': 14, fill: INK, transform: 'rotate(90 71.3 150.1)' });
+const image = el('g', {}, encoder);
+el('path', { d: 'M33.2,242 V223', stroke: '#000', 'stroke-width': 1, 'stroke-dasharray': '1.2 2.2', fill: 'none' }, image);
+el('path', { d: 'M33.2,217.3 l-2.6,5.4 h5.2 z', fill: '#000' }, image);
+label(image, 33.1, 253.8, 'image', { 'font-size': 14, fill: INK });
+
+// Abstraction Fusion: its name and its arrow from the top of the encoder to the shared tokens.
+const AF_X = 33.6, AF_Y = 60.6;
+const fusion = group();
+label(fusion, 64.2, 27.3, 'Abstraction', { 'font-size': 15.9, fill: BLUE });
+label(fusion, 62.3, 46.5, 'Fusion', { 'font-size': 15.9, fill: BLUE });
+el('path', { d: `M34.2,89 V${AF_Y} H107.5`, stroke: BLUE, 'stroke-width': 2, fill: 'none', 'stroke-linejoin': 'round' }, fusion);
+el('path', { d: `M113.3,${AF_Y} l-6.4,-3.4 v6.8 z`, fill: BLUE }, fusion);
+
+// What the model reads: the shared tokens and the language.
+const sharedIn = group();
+const sharedInName = label(sharedIn, SHARED_IN_X + ROW / 2, 31.3, 'vision', { 'font-size': 15.9, fill: INK });
+const sharedInRow = tokenRow(sharedIn, 'readRow', SHARED_IN_X, IN_Y, 'url(#whole)');
+const sharedInArrow = arrowDown(sharedIn, 168, 76.5, 87.6);
+const langIn = group();
+const langInName = label(langIn, 292.3, 31.3, 'language', { 'font-size': 15.9, fill: INK });
+const langInRow = tokenRow(langIn, 'promptRow', LANG_X, IN_Y, GRAY);
+langInRow.reveal(1);
+const langInArrow = arrowDown(langIn, 291, 76.5, 87.6);
+
+// What the model writes: language.
+const langOut = group();
+const langOutArrow = arrowDown(langOut, 290.5, 206.3, 217.4);
+const langOutRow = tokenRow(langOut, 'writeRow', LANG_X, OUT_Y, GRAY);
+const langOutName = label(langOut, 292.3, 261.7, 'language', { 'font-size': 15.9, fill: INK });
+
+// What Block-wise MoT generates: shared tokens. A token that is being generated is the token
+// itself, coming up, with fine light grain over it that comes and then goes. The grain is noise
+// made by a filter, each token's its own, cut to the token's shape.
+const sharedOutGroup = group();
+const sharedOutArrow = arrowDown(sharedOutGroup, 413.6, 206.3, 217.4);
+const sharedOutName = label(sharedOutGroup, SHARED_OUT_X + ROW / 2, 261.7, 'vision', { 'font-size': 15.9, fill: INK });
+const sharedOutPlaces = tokenPlaces(sharedOutGroup, SHARED_OUT_X, OUT_Y);
+const sharedOut = [];
+for (let j = 0; j < TOKENS; j++) {
+  const x = SHARED_OUT_X + j * STEP;
+  const filter = el('filter', { id: 'grain' + j, x: 0, y: 0, width: 1, height: 1, 'color-interpolation-filters': 'sRGB' }, defs);
+  el('feTurbulence', { type: 'fractalNoise', baseFrequency: 1.15, numOctaves: 2, seed: 11 + 7 * j, result: 'noise' }, filter);
+  // Gray from the noise's red channel, light: from about 0.45 to white. Fully opaque.
+  el('feColorMatrix', { in: 'noise', type: 'matrix', values: '1.5 0 0 0 0.08  1.5 0 0 0 0.08  1.5 0 0 0 0.1  0 0 0 0 1', result: 'gray' }, filter);
+  el('feComposite', { in: 'gray', in2: 'SourceGraphic', operator: 'in' }, filter);
+  const clean = el('rect', { x, y: OUT_Y, width: TOKEN, height: TOKEN, rx: 3.5, fill: 'url(#turned)' }, sharedOutGroup);
+  const grain = el('rect', { x, y: OUT_Y, width: TOKEN, height: TOKEN, rx: 3.5, fill: '#888', filter: `url(#grain${j})`, opacity: 0 }, sharedOutGroup);
+  sharedOut.push({ clean, grain });
+}
+// Block-wise MoT: its name, and its arrow from the model around to the generated tokens.
+const MOT = [[479.6, 146], [497, 146], [497, 234], [475, 234]];
+const mot = group();
+label(mot, 527.6, 198.8, 'Block-wise', { 'font-size': 15.9, fill: BLUE, transform: 'rotate(90 527.6 198.8)' });
+label(mot, 508.4, 197, 'MoT', { 'font-size': 15.9, fill: BLUE, transform: 'rotate(90 508.4 197)' });
+el('path', { d: 'M' + MOT.map((p) => p.join(',')).join(' L'), stroke: BLUE, 'stroke-width': 2, fill: 'none', 'stroke-linejoin': 'round' }, mot);
+el('path', { d: 'M469.2,234 l6.4,-3.4 v6.8 z', fill: BLUE }, mot);
+
+// The two words. Each stays as it is set in the figure; for its turn only its color gets darker.
+const WORD_READ = [hex(GRAY), hex(INK)], WORD_GENERATE = [hex('#6e82a7'), hex(BLUE)];
+const understanding = label(front, 229.8, 14.3, 'understanding', { 'font-size': 12 });
+const generation = label(front, 548.5, 141, 'generation', { 'font-size': 12, transform: 'rotate(90 548.5 141)' });
+
+// The generated tokens on their way to being read: the eight of them again, each on the way
+// around the model. The way is for a token's center: from the last generated token's place left
+// along the bottom, around a corner, up the model's left side (between it and the encoder),
+// around a corner, and right along the top. place(u) is the point u units along it and how far a
+// token there has turned, in degrees: 0 along the bottom, 90 going up, 180 along the top.
+const HALF = TOKEN / 2, CORNER = 14;
+const WAY = { right: SHARED_OUT_X + 3 * STEP + HALF, bottom: OUT_Y + HALF, left: 72.35, top: IN_Y + HALF };
+const LEGS = [WAY.right - WAY.left - CORNER, Math.PI * CORNER / 2, WAY.bottom - WAY.top - 2 * CORNER, Math.PI * CORNER / 2];
+const TURNS = LEGS.map((leg, i) => LEGS.slice(0, i + 1).reduce((a, b) => a + b, 0));   // where each leg ends
+function place(u) {
+  if (u < TURNS[0]) return [WAY.right - u, WAY.bottom, 0];
+  if (u < TURNS[1]) {
+    const a = (u - TURNS[0]) / CORNER;
+    return [WAY.left + CORNER - CORNER * Math.sin(a), WAY.bottom - CORNER + CORNER * Math.cos(a), a * 180 / Math.PI];
+  }
+  if (u < TURNS[2]) return [WAY.left, WAY.bottom - CORNER - (u - TURNS[1]), 90];
+  if (u < TURNS[3]) {
+    const a = (u - TURNS[2]) / CORNER;
+    return [WAY.left + CORNER - CORNER * Math.cos(a), WAY.top + CORNER - CORNER * Math.sin(a), 90 + a * 180 / Math.PI];
+  }
+  return [WAY.left + CORNER + (u - TURNS[3]), WAY.top, 180];
+}
+// Each token: where on the way it starts (its generated place), and how far it goes, to the place
+// of a token that is read. In one line around the model, the last generated vision token comes to
+// the first vision place, and so on back through the language.
+const travelers = el('g', { opacity: 0 }, front);
+const fed = [];
+for (const [x0, target0, fill] of [[SHARED_OUT_X, SHARED_IN_X, 'url(#turned)'], [LANG_X, LANG_X, GRAY]]) {
+  for (let j = 0; j < TOKENS; j++) {
+    const from = WAY.right - (x0 + j * STEP + HALF);                             // on the bottom
+    const to = TURNS[3] + (target0 + (TOKENS - 1 - j) * STEP + HALF) - (WAY.left + CORNER);   // on the top
+    const g = el('g', {}, travelers);
+    el('rect', { x: -HALF, y: -HALF, width: TOKEN, height: TOKEN, rx: 3.5, fill }, g);
+    fed.push({ g, from, far: to - from });
+  }
+}
+
+// What moves: one blue dot, along the two blue arrows. For understanding it goes along the
+// Abstraction Fusion arrow, from the top of the encoder to the tip; for generation, from the model
+// through Block-wise MoT to the tip of its arrow.
+const dot = el('circle', { r: 4.2, fill: BLUE, opacity: 0 }, front);
+function way(points) {
+  const lengths = points.slice(1).map((p, i) => Math.abs(p[0] - points[i][0]) + Math.abs(p[1] - points[i][1]));
+  return { points, lengths, total: lengths.reduce((a, b) => a + b, 0) };
+}
+function along(w, d) {
+  for (let i = 0; i < w.lengths.length; i++) {
+    if (d <= w.lengths[i] || i === w.lengths.length - 1) {
+      const p = clamp(d / w.lengths[i]), a = w.points[i], b = w.points[i + 1];
+      return [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p];
+    }
+    d -= w.lengths[i];
+  }
+}
+const READ_WAY = way([[34.2, 89], [34.2, AF_Y], [108, AF_Y]]);
+const MOT_WAY = way(MOT);
+
+// Times, in seconds.
+const TURN = 1.3;                                  // how long a change of view takes: slowly
+const STILL = 1.0;                                 // a stop
+const BOUNCE = 0.55, POKE = 0.7;                   // "image" bouncing once; an arrow moving into place
+const SNAP = 0.15;                                 // how long coming back strong takes: at once
+const FLOW = 165;                                  // units per second, for the dot of understanding
+// Understanding.
+const TO_READ = 0;                             // the view turns to understanding, and all is cleared
+const IMAGE_BOUNCE = TO_READ + TURN + 0.4;
+// One front at one speed (FLOW): up the encoder, along the arrow (the dot), across the tokens.
+const ENCODE_FROM = IMAGE_BOUNCE + BOUNCE * 0.6, ENCODE_DUR = (ENCODER_BOTTOM - ENCODER_TOP) / FLOW;
+const ENCODED = ENCODE_FROM + ENCODE_DUR;                     // the encoder is full
+const FEATURE_FROM = ENCODED, FEATURE_DUR = READ_WAY.total / FLOW;
+const TOKENS_FROM = FEATURE_FROM + FEATURE_DUR, TOKENS_DUR = ROW / FLOW;
+const READ_FROM = TOKENS_FROM + TOKENS_DUR + 0.25;           // the arrows into the model come
+// Generation.
+const TO_GENERATE = READ_FROM + POKE + STILL;      // the view turns to generation
+const WRITE_FROM = TO_GENERATE + TURN + 0.4, WRITE_DUR = 0.9;    // language: its arrow, then it
+const DRAW_FROM = WRITE_FROM + POKE * 0.5 + WRITE_DUR + 0.4;     // shared tokens: their arrow
+const SIGNAL_FROM = DRAW_FROM, SIGNAL_DUR = 0.9;                 // with it: Block-wise MoT, and the dot
+const NOISE_FROM = SIGNAL_FROM + SIGNAL_DUR - 0.1, DENOISE_DUR = 2.0;
+const DONE = NOISE_FROM + DENOISE_DUR;
+// What was generated becomes what is read.
+const UNREAD = DONE + STILL, UNREAD_DUR = 0.6;     // the tokens the model read go blank, their arrows go
+const FEED_FROM = UNREAD + UNREAD_DUR + 0.3, FEED_DUR = 2.6;    // the generated tokens go around
+const FED = FEED_FROM + FEED_DUR;
+// The end: the whole figure comes back, and that is where it starts again.
+const TO_WHOLE = FED + STILL;
+const LENGTH = TO_WHOLE + TURN;
+
+const BACK = 0.3;      // how strong what is faint while it waits to be made again is
+// How strong what is out of the view is, close to white: the lower right of the diagonal during
+// understanding; and during generation the panel's upper left, the encoder, Abstraction Fusion
+// and the word "understanding".
+const FAR = 0.07;
+// An arrow that has been cleared comes again: it moves down into its place, once. Sets where the
+// arrow is `since` seconds after it started, and returns how strong it is.
+function comes(arrow, since) {
+  const beat = clamp(since / POKE);
+  arrow.setAttribute('transform', `translate(0 ${-6 * (1 - smooth(beat))})`);
+  return smooth(since / (POKE * 0.4));
+}
+
+function render(time) {
+  const t = Math.max(0, Math.min(time, LENGTH));
+  // Whose turn it is.
+  const turnRead = smooth((t - TO_READ) / TURN) * (1 - smooth((t - TO_GENERATE) / TURN));
+  const turnGenerate = smooth((t - TO_GENERATE) / TURN) * (1 - smooth((t - TO_WHOLE) / TURN));
+  // While the generated tokens go around to be read, the view goes with them: first the lower
+  // right goes (over the first 0.6 of their way), then the upper left comes (from 0.35 of it).
+  // Both hold until the whole figure comes back.
+  const way = smooth((t - FEED_FROM) / FEED_DUR), whole = smooth((t - TO_WHOLE) / TURN);
+  const going = smooth(way / 0.6) * (1 - whole), coming = smooth((way - 0.35) / 0.65) * (1 - whole);
+  understanding.setAttribute('fill', rgb(mix(WORD_READ[0], WORD_READ[1], Math.max(turnRead, coming))));
+  generation.setAttribute('fill', rgb(mix(WORD_GENERATE[0], WORD_GENERATE[1], turnGenerate)));
+  generation.setAttribute('opacity', 1 - (1 - FAR) * going);
+  const aside = 1 - (1 - FAR) * turnGenerate;           // the encoder and Abstraction Fusion, while generating
+  const upperLeft = 1 - (1 - aside) * (1 - coming);     // the panel's upper left and "understanding"
+  backSides.lowerRight.setAttribute('stop-opacity', (1 - (1 - FAR) * turnRead) * (1 - (1 - FAR) * going));
+  frontSides.lowerRight.setAttribute('stop-opacity', 1 - (1 - FAR) * turnRead);
+  backSides.upperLeft.setAttribute('stop-opacity', upperLeft);
+  encoder.setAttribute('opacity', aside);
+  understanding.setAttribute('opacity', upperLeft);
+
+  // Understanding: what it makes is there, then cleared at once, then made again.
+  const cleared = smooth((t - TO_READ) / TURN);         // with the turn, like what generation makes
+  const bounce = clamp((t - IMAGE_BOUNCE) / BOUNCE);
+  image.setAttribute('transform', `translate(0 ${-5 * Math.sin(Math.PI * bounce)})`);
+  const encoding = t >= ENCODE_FROM;
+  encodedLayers.setAttribute('opacity', encoding ? 1 : 1 - cleared);
+  encode(encoding ? (t - ENCODE_FROM) / ENCODE_DUR : 1);
+  // Abstraction Fusion is strong again by the time the encoder is full.
+  const fused = t >= ENCODED - SNAP ? BACK + (1 - BACK) * smooth((t - ENCODED + SNAP) / SNAP) : 1 - (1 - BACK) * cleared;
+  fusion.setAttribute('opacity', fused * aside);
+  // At the end the tokens the model read go blank, and the generated ones come into their places;
+  // once those are in (FED), the tokens are simply there again. Their arrows go with them and come
+  // back with the whole figure.
+  const unread = t >= FED ? 0 : smooth((t - UNREAD) / UNREAD_DUR);
+  const filling = t >= TOKENS_FROM;
+  sharedInRow.tokens.setAttribute('opacity', filling ? 1 - unread : 1 - cleared);
+  sharedInRow.reveal(filling ? (t - TOKENS_FROM) / TOKENS_DUR : 1);
+  langInRow.tokens.setAttribute('opacity', 1 - unread);
+  // With the tokens go their places, so that nothing is left there, and their names. The names
+  // come back as the generated tokens come in.
+  sharedInRow.places.setAttribute('opacity', 1 - unread);
+  langInRow.places.setAttribute('opacity', 1 - unread);
+  const named = 1 - smooth((t - UNREAD) / UNREAD_DUR) * (1 - smooth((t - FED + 0.6) / 0.6));
+  sharedInName.setAttribute('opacity', named);
+  langInName.setAttribute('opacity', named);
+  const reading = t >= READ_FROM;
+  const arrows = 1 - smooth((t - UNREAD) / UNREAD_DUR) * (1 - whole);
+  if (!reading) { sharedInArrow.setAttribute('transform', ''); langInArrow.setAttribute('transform', ''); }
+  sharedInArrow.setAttribute('opacity', reading ? comes(sharedInArrow, t - READ_FROM) * arrows : 1 - cleared);
+  langInArrow.setAttribute('opacity', reading ? comes(langInArrow, t - READ_FROM) * arrows : 1 - cleared);
+
+  // Generation, in the same way. Language first, then the shared tokens.
+  const emptied = smooth((t - TO_READ) / TURN);         // cleared as the lower right fades, at the start
+  const writing = t >= WRITE_FROM;
+  if (!writing) langOutArrow.setAttribute('transform', '');
+  // Once the generated tokens have left to be read, nothing is left where they were, until the
+  // whole figure comes back: not their places, their arrows or their names.
+  const left = t >= FEED_FROM, again = whole;
+  const vacated = 1 - smooth((t - FEED_FROM) / 0.4) * (1 - again);
+  langOutArrow.setAttribute('opacity', (writing ? comes(langOutArrow, t - WRITE_FROM) : 1 - emptied) * vacated);
+  langOutName.setAttribute('opacity', vacated);
+  sharedOutName.setAttribute('opacity', vacated);
+  langOutRow.places.setAttribute('opacity', vacated);
+  sharedOutPlaces.setAttribute('opacity', vacated);
+  const written = t >= WRITE_FROM + POKE * 0.5;
+  langOutRow.tokens.setAttribute('opacity', left ? again : written ? 1 : 1 - emptied);
+  langOutRow.reveal(written ? smooth((t - WRITE_FROM - POKE * 0.5) / WRITE_DUR) : 1);
+  const drawing = t >= DRAW_FROM;
+  if (!drawing) sharedOutArrow.setAttribute('transform', '');
+  sharedOutArrow.setAttribute('opacity', (drawing ? comes(sharedOutArrow, t - DRAW_FROM) : 1 - emptied) * vacated);
+  mot.setAttribute('opacity', (t >= SIGNAL_FROM ? BACK + (1 - BACK) * smooth((t - SIGNAL_FROM) / SNAP) : 1 - (1 - BACK) * emptied) * vacated);
+  // The tokens come up from blank: the grain comes first, lightly, and goes as the token comes.
+  const denoising = t >= NOISE_FROM, p = clamp((t - NOISE_FROM) / DENOISE_DUR);
+  sharedOut.forEach((token) => {
+    token.clean.setAttribute('opacity', left ? again : denoising ? smooth((p - 0.12) / 0.88) : 1 - emptied);
+    token.grain.setAttribute('opacity', denoising ? 0.8 * smooth(p / 0.3) * (1 - smooth((p - 0.3) / 0.7)) : 0);
+  });
+
+  // What was generated becomes what is read: the generated tokens go around the model.
+  travelers.setAttribute('opacity', left && t < FED ? 1 : 0);
+  const gone = smooth((t - FEED_FROM) / FEED_DUR);
+  for (const token of fed) {
+    const [x, y, turn] = place(token.from + token.far * gone);
+    token.g.setAttribute('transform', `translate(${x} ${y}) rotate(${turn})`);
+  }
+
+  // The dot.
+  const feature = (t - FEATURE_FROM) / FEATURE_DUR, signal = (t - SIGNAL_FROM) / SIGNAL_DUR;
+  let at = null;
+  if (feature > 0 && feature < 1) at = along(READ_WAY, READ_WAY.total * feature);
+  if (signal > 0 && signal < 1) at = along(MOT_WAY, MOT_WAY.total * smooth(signal));
+  if (at) { dot.setAttribute('cx', at[0]); dot.setAttribute('cy', at[1]); }
+  dot.setAttribute('opacity', at ? 1 : 0);
+}
+
+// The clock runs while the reader has the animation playing, the figure is on screen, and the
+// timeline is not being dragged. At the end it stops, paused on the last picture (the whole
+// figure); playing it again starts it from the beginning.
+const toggle = document.getElementById('toggle'), toggleIcon = document.getElementById('toggleIcon');
+const timeline = document.getElementById('timeline');
+timeline.max = LENGTH;
+let clock = 0, last = null, loop = 0;
+let playing = true, onScreen = false, dragging = false, held = false;
+function show() {
+  render(clock);
+  timeline.value = clock;
+}
+function frame(now) {
+  if (last !== null) clock += (now - last) / 1000;
+  last = now;
+  if (clock >= LENGTH) {
+    clock = LENGTH;
+    show();
+    playing = false;
+    update();
+    return;
+  }
+  show();
+  loop = requestAnimationFrame(frame);
+}
+function update() {
+  const run = playing && onScreen && !dragging && !held;
+  if (run && !loop) { last = null; loop = requestAnimationFrame(frame); }
+  if (!run && loop) { cancelAnimationFrame(loop); loop = 0; }
+  document.body.classList.toggle('paused', !playing);
+  toggle.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  toggleIcon.setAttribute('d', playing ? 'M3.5,2.5 h3 v11 h-3 z M9.5,2.5 h3 v11 h-3 z' : 'M4,2 L14,8 L4,14 z');
+}
+function flip() {
+  if (!playing && clock >= LENGTH) clock = 0;
+  playing = !playing;
+  update();
+}
+toggle.addEventListener('click', (event) => { flip(); if (event.detail) toggle.blur(); });
+svg.addEventListener('click', flip);
+timeline.addEventListener('pointerdown', () => { dragging = true; playing = false; update(); });
+timeline.addEventListener('input', () => { playing = false; clock = +timeline.value; render(clock); update(); });
+['pointerup', 'pointercancel'].forEach((type) => window.addEventListener(type, () => { dragging = false; update(); }));
+new IntersectionObserver((entries) => { onScreen = entries[entries.length - 1].intersectionRatio >= 0.5; update(); }, { threshold: 0.5 }).observe(svg);
+
+// For rendering single frames: seek(t), or ?t= in the address, shows time t and holds it.
+window.seek = function (t) { held = true; update(); render(t); };
+window.TIMES = { TO_READ, IMAGE_BOUNCE, FEATURE_FROM, ENCODED, TOKENS_FROM, READ_FROM, TO_GENERATE, WRITE_FROM, DRAW_FROM, SIGNAL_FROM, NOISE_FROM, DONE, UNREAD, FEED_FROM, FED, TO_WHOLE, LENGTH };
+const at = new URLSearchParams(location.search).get('t');
+show();
+update();
+if (at !== null) window.seek(parseFloat(at));
+</script>
+</body>
+</html>

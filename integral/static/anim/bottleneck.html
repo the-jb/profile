@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Propagation bottleneck: one layer, the joint encoder, Abstraction Fusion</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400..700&family=Google+Sans+Flex:wght@300..600&display=swap">
+<style>
+  html { background: #fff; font-family: "Google Sans", -apple-system, "Segoe UI", sans-serif; color: #1d1d1f; }
+  body { margin: 0; }
+  #stage { display: block; width: 100%; max-width: 760px; margin: 0 auto; cursor: pointer; }
+  /* The controls, in a bar under the canvas: a button to play and pause, and the timeline. They
+     show while the pointer is over the figure, while one of them has the focus, and while the
+     animation is paused; where there is no pointer to hover with, they always show. */
+  #bar { display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 40px; max-width: 760px; margin: 0 auto; padding: 0 14px; opacity: 0; transition: opacity 0.2s; }
+  html:hover #bar, #bar:focus-within, body.paused #bar { opacity: 1; }
+  @media (hover: none) { #bar { opacity: 1; } }
+  #toggle { flex: none; width: 30px; height: 30px; padding: 7px; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+  #toggle:hover { background: #eee; }
+  #toggle svg { display: block; width: 16px; height: 16px; fill: #1d1d1f; }
+  #timeline { flex: 1; min-width: 0; margin: 0; accent-color: #1d1d1f; cursor: pointer; }
+  /* geometricPrecision: letters are placed and sized without snapping to whole pixels, so text
+     that moves or changes size does so evenly. */
+  text { font-family: inherit; text-rendering: geometricPrecision; }
+  /* The explaining lines are set light. Google Sans has no weight under 400, so they use Google
+     Sans Flex, the same design with a full range of weights. */
+  text.note { font-family: "Google Sans Flex", "Google Sans", sans-serif; font-weight: 300; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 760 500" role="img" aria-label="Animation of the propagation bottleneck and Abstraction Fusion."></svg>
+<div id="bar">
+  <button id="toggle" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path id="toggleIcon"/></svg></button>
+  <input id="timeline" type="range" min="0" step="0.01" value="0" aria-label="Position in the animation">
+</div>
+<script>
+// The propagation bottleneck hypothesis in two scenes.
+//
+// Scene 1, one layer. It starts as the semantic encoder, which only abstracts: the semantic
+// objective holds the whole layer and every feature comes out abstracted. Then a reconstruction
+// objective is added (the joint encoder). It needs low-level detail to survive the layer, so it
+// takes part of the layer for passing features through unchanged. The two then share the layer:
+// first the reconstruction objective is the stronger one, so more features stay low-level and the
+// rest are abstracted only weakly; then the semantic objective is, so more of the layer abstracts
+// and fewer features stay low-level. Features go through the layer once, through the semantic
+// encoder; from then on the features that are out change where they are as the balance shifts.
+// The abstracting side of the layer is full blue for the semantic encoder and gets paler as the
+// reconstruction side grows.
+//
+// The view then zooms out: the layer shrinks into the middle layer of the joint-training stack of
+// scene 2. On the way its boundary goes back to the middle, and it has that layer's colors by the
+// time it lands.
+//
+// Scene 2, the whole encoder (the paper's Fig. 3a in motion, with its layer colors, which get
+// deeper with depth). First joint training: a row of features goes down through all the layers,
+// and then the boundary sways in every layer at once, low-level against high-level: this is the
+// propagation bottleneck. Then Abstraction Fusion takes the place of joint training: its frozen
+// layers only abstract, a row of features goes down through them, and one feature from every row
+// is read out and fused.
+//
+// The picture is a function of time: seek(t) draws time t on its own and stops the loop.
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('stage');
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+function label(parent, x, y, text, attrs) {
+  const e = el('text', Object.assign({ x, y, 'text-anchor': 'middle' }, attrs), parent);
+  e.textContent = text;
+  return e;
+}
+// A line of text in which some words are set apart: each part is a string, or [string, attrs].
+function line(parent, x, y, parts, attrs) {
+  const text = el('text', Object.assign({ x, y }, attrs), parent);
+  parts.forEach((part) => {
+    const [words, own] = Array.isArray(part) ? part : [part, {}];
+    el('tspan', own, text).textContent = words;
+  });
+  return text;
+}
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const smooth = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+const lerp = (a, b, u) => a + (b - a) * u;
+
+// BLUE, for everything written or drawn in blue, is the color of the most abstract feature.
+const INK = '#1d1d1f', RED = '#e0352b', BLUE = '#0e4eba';
+// In the explaining lines, the two things the story is about are set a little stronger:
+// low-level in ink, abstraction in the blue of high-level.
+const KEY_LOW = { 'font-weight': 500, fill: INK }, KEY_HIGH = { 'font-weight': 500, fill: BLUE };
+// Feature color by how abstract it is, 0 (low-level) to 5 (most abstract).
+const FEATURE = [[140, 140, 140], [190, 210, 240], [150, 184, 234], [104, 152, 226], [56, 118, 214], [14, 78, 186]];
+function featureRGB(v) {
+  const a = Math.min(4, Math.floor(v)), u = v - a;
+  return FEATURE[a].map((c, k) => lerp(c, FEATURE[a + 1][k], u));
+}
+const rgb = (c) => 'rgb(' + c.map(Math.round).join(',') + ')';
+const featureColor = (v) => rgb(featureRGB(v));
+// A feature: a square when low-level, a circle when abstract. level: how abstract it is where the
+// layer abstracts it; kept: how far it is kept low-level instead, 0 to 1. Between kept and
+// abstracted, its color and its corners go straight from the one to the other: they do not pass
+// through the paler colors of the levels in between, which would make it flash.
+function draw(node, size, cx, cy, level, alpha, kept = 0) {
+  node.setAttribute('opacity', alpha);
+  if (alpha <= 0) return;
+  node.setAttribute('x', cx - size / 2);
+  node.setAttribute('y', cy - size / 2);
+  node.setAttribute('rx', size * (0.14 + 0.36 * (1 - kept) * level / 5));
+  node.setAttribute('fill', rgb(featureRGB(level).map((c, k) => lerp(c, FEATURE[0][k], kept))));
+}
+function pool(parent, count, size) {
+  return Array.from({ length: count }, () => el('rect', { width: size, height: size, opacity: 0 }, parent));
+}
+// The layers have the colors of the paper's figure, which get deeper with depth. PAPER holds the
+// colors of its Abstraction Fusion layers 1 to 5, from the gray of low-level features to the
+// deepest blue.
+const PAPER = [[220, 220, 220], [175, 195, 218], [131, 170, 217], [87, 145, 215], [42, 120, 214]];
+const LAYER_ALPHA = 0.8;
+function layerColor(v) {                            // v: 0 (the first color of PAPER) to 4 (the last)
+  const a = Math.min(3, Math.floor(v)), u = v - a;
+  // The fill is set so that the layer, drawn at LAYER_ALPHA over white, shows the paper's color.
+  return 'rgb(' + PAPER[a].map((c, k) => Math.max(0, Math.round((lerp(c, PAPER[a + 1][k], u) - 255 * (1 - LAYER_ALPHA)) / LAYER_ALPHA))).join(',') + ')';
+}
+
+// The share of a layer that the reconstruction objective holds: it starts at `share` and moves to
+// `to`, from time `from`, over `dur` seconds, for each of the moves.
+function shareAt(moves, share, t) {
+  moves.forEach((m) => { share = lerp(share, m.to, smooth((t - m.from) / m.dur)); });
+  return share;
+}
+// With a given share, the features under the reconstruction side come out unchanged (kept), and
+// the others are abstracted the more, the more of the layer is left for abstraction. This is
+// continuous in the share, so features that are already out can follow the boundary as it moves.
+// A feature goes from kept to abstracted while the boundary moves KEPT_OVER of the layer's width
+// across it: nearly the distance between two features, so that each changes gradually and the
+// next begins as it ends.
+const SLOTS = 8, KEPT_OVER = 0.115;
+const keptAt = (share, s) => smooth((share - (s + 0.5) / SLOTS) / KEPT_OVER + 0.5);
+
+// A title often has a line or two under it that explains it. Everywhere, those lines come after
+// their title and more slowly: over NOTE_DUR, from NOTE_LATE after the title starts to come. What
+// the text is about starts moving only once the lines are fully there: READ after the title
+// started to come.
+const NOTE_LATE = 0.4, NOTE_DUR = 1.4, READ = NOTE_LATE + NOTE_DUR + 0.3;
+const noteAt = (since) => smooth((since - NOTE_LATE) / NOTE_DUR);   // since: seconds since the title started to come
+
+const defs = el('defs', {}, svg);
+
+// ---------------------------------------------------------------------------------------------
+// Scene 2 is built first, so that scene 1 is drawn over it while the view zooms out.
+// ---------------------------------------------------------------------------------------------
+const full = el('g', { opacity: 0 }, svg);
+// The two encoders are separate groups in the same place: joint training is shown first, and
+// Abstraction Fusion then takes its place.
+const jointSide = el('g', {}, full), fusionSide = el('g', { opacity: 0 }, full);
+// A stack comes in by steps: its layers are there first; then the top row of features with its
+// label (from ROW_FROM); then the words under the stack (from WORDS_FROM); then the features set
+// off. They reach layer k at start(k) and pass it in DUR, the whole encoder in LAYERS * DUR.
+const ROW_FROM = 0.3, WORDS_FROM = 1.0, FIRST = 1.7, DUR = 0.8;
+const stepIn = (t, from) => clamp((t - from) / 0.4);
+const start = (k) => FIRST + (k - 1) * DUR;
+const LAYERS = 5, W = 232, LAYER_H = 40, STEP = 68, S = 14;
+const LB = 70;                                     // the left edge of the stack
+const rowY = (k) => 48 + k * STEP;                 // feature row k: after k layers
+const layerTop = (k) => rowY(k - 1) + 14;          // layer k sits between rows k-1 and k
+const slotX = (s) => LB + 25 + s * 26;
+const TEXT_Y = 429, TITLE_Y = 464;                 // under the joint-training stack
+// Under the Abstraction Fusion stack: the word for its last row, then the fused feature.
+const HIGH_Y = 414, FUSED_Y = 442, FUSION_TITLE_Y = 487;
+
+// Features are drawn first and the layers on top, slightly transparent, so that a feature can be
+// seen going through a layer and coming out changed. The label over the top row says what the
+// features there are, and comes in with them.
+const [jointRows, fusionRows] = [jointSide, fusionSide].map((side) => {
+  const g = el('g', {}, side);
+  return {
+    input: label(side, LB + W / 2, 24, 'low-level', { 'font-size': 15, fill: '#444', opacity: 0 }),
+    rest: Array.from({ length: LAYERS + 1 }, () => pool(g, SLOTS, S)),
+    move: Array.from({ length: LAYERS + 1 }, () => pool(g, SLOTS, S)),
+  };
+});
+// A stack of layers. fill(k) is the color of layer k.
+function stack(side, fill, title, titleY) {
+  const layers = [];
+  for (let k = 1; k <= LAYERS; k++) {
+    const y = layerTop(k);
+    const body = el('rect', { x: LB, y, width: W, height: LAYER_H, rx: 6, fill: fill(k), opacity: LAYER_ALPHA }, side);
+    const name = label(side, LB + W / 2, y + 26, 'ViT Layer', { 'font-size': 17 });
+    layers.push({ body, name });
+  }
+  label(side, LB + W / 2, titleY, title, { 'font-size': 23 });
+  return layers;
+}
+// How blue layer k is under Abstraction Fusion, on the scale of layerColor. The paper's figure has
+// its first layer gray; here the first layer is already a little blue (the paper's second color),
+// so that under joint training its two sides can be told apart, and the last is the paper's last.
+const depthLevel = (k) => 1 + (k - 1) * 3 / (LAYERS - 1);
+// Joint training, as in the paper's figure: the left of every layer stays the gray of low-level
+// features, and the right gets bluer with depth, at the rate of Abstraction Fusion times the share
+// of the layer that is left for abstraction (half of it at rest). Each layer has its own pair of
+// stops, so that the boundary can move. Abstraction Fusion: one color per layer.
+const RAMP = 0.13;                                   // half the width of the passage from gray to blue
+const jointStops = [];
+for (let k = 1; k <= LAYERS; k++) {
+  const grad = el('linearGradient', { id: 'joint' + k, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+  jointStops.push([el('stop', { 'stop-color': layerColor(0) }, grad), el('stop', {}, grad)]);
+}
+const jointLayers = stack(jointSide, (k) => 'url(#joint' + k + ')', 'Joint encoder', TITLE_Y);
+stack(fusionSide, (k) => layerColor(depthLevel(k)), 'Abstraction Fusion', FUSION_TITLE_Y);
+
+// Under joint training the two are in conflict. The two words come first; the sign between them
+// comes with the hypothesis, once the features are down. As the boundary of the layers moves, the side that
+// gains is set larger and the other smaller, and the sign moves towards the smaller. Each word
+// grows and shrinks about its own middle, which stays where it is, far enough from the middle of
+// the stack for the word at its largest and the sign beside it.
+// The sign is drawn as a shape, not typed: the page's font does not have the character, so typed
+// it comes out in whatever other font each machine falls back to, and looks different from one
+// machine to the next.
+const SIGN_X = LB + W / 2, SIGN_UP = 5;              // SIGN_UP: the middle of the 16px words above their baseline
+const conflictLow = label(jointSide, SIGN_X - 64, TEXT_Y, 'low-level', { fill: '#444' });
+const conflictSign = el('path', { d: 'M-11,0 H11 M-6.5,-4 L-11,0 L-6.5,4 M6.5,-4 L11,0 L6.5,4', fill: 'none', stroke: RED, 'stroke-width': 1.7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, jointSide);
+const conflictHigh = label(jointSide, SIGN_X + 68, TEXT_Y, 'high-level', { fill: BLUE });
+function weigh(node, strength) {                     // strength: the side's share of the layer; 0.5 at rest
+  const size = 16 * (0.5 + strength);
+  node.setAttribute('font-size', size);
+  node.setAttribute('y', TEXT_Y - SIGN_UP + size * SIGN_UP / 16);   // the baseline that keeps the word's middle in place
+  node.setAttribute('font-weight', 400 + Math.round(600 * Math.max(0, strength - 0.5)));
+}
+// Under Abstraction Fusion the last row has its own word, as the top row has; under it the fused
+// feature is built, with no words.
+const fusionHigh = label(fusionSide, LB + W / 2, HIGH_Y, 'high-level', { 'font-size': 15, fill: BLUE, opacity: 0 });
+// The text beside the stack comes in only once the features are down.
+const fusing = el('g', { opacity: 0 }, fusionSide);
+
+// Abstraction Fusion reads the features after every layer: a dashed tap from each row to a bus,
+// which ends in an arrow at the fused features. Those are one feature from every row, side by
+// side in the middle under the stack. They leave the arrow one after another and each joins the
+// ones before it, MERGED apart so that they touch, until they are one. fusedX(p): where the
+// p-th to arrive goes, counted from the left.
+const MERGED = 13;
+const fusedX = (p) => LB + W / 2 + (p - LAYERS / 2) * MERGED;
+const TAP_X = LB + W + 4, BUS = LB + W + 34, TIP = fusedX(LAYERS) + 19;
+// The path is not just shown but drawn, the way the features will go: the taps run out from the
+// rows, the bus runs down, the last stretch runs in under the stack, and the arrowhead comes at
+// its end.
+const wire = () => el('path', { stroke: INK, 'stroke-width': 1.4, 'stroke-dasharray': '4 4', fill: 'none' }, fusionSide);
+const taps = Array.from({ length: LAYERS + 1 }, wire), busDown = wire(), busIn = wire();
+const arrowHead = el('path', { d: `M${TIP - 1.4},${FUSED_Y} l12.6,-6.3 v12.6 z`, fill: INK, opacity: 0 }, fusionSide);
+function drawWires(drawn) {                          // drawn: 0 nothing yet, 1 all of it
+  const out = clamp(drawn / 0.2), down = clamp((drawn - 0.17) / 0.55), into = clamp((drawn - 0.7) / 0.25);
+  taps.forEach((tap, k) => tap.setAttribute('d', `M${TAP_X},${rowY(k)} H${lerp(TAP_X, BUS, out)}`));
+  busDown.setAttribute('d', `M${BUS},${rowY(0)} V${lerp(rowY(0), FUSED_Y, down)}`);
+  busIn.setAttribute('d', `M${BUS},${FUSED_Y} H${lerp(BUS, TIP, into)}`);
+  arrowHead.setAttribute('opacity', clamp((drawn - 0.93) / 0.07));
+}
+
+// One row of features goes down at one speed, from the top row through every layer to the last
+// row, and leaves behind after each layer what it was there. t: seconds since the pass began;
+// level(k): how abstract a feature is after k layers where the layers abstract it; kept(s): how
+// far slot s is kept low-level instead.
+const END = start(LAYERS) + DUR;                     // the features have left the last layer
+function pass({ input, rest, move }, t, level, kept) {
+  const shown = stepIn(t, ROW_FROM);                   // the top row and its label come in
+  input.setAttribute('opacity', shown);
+  for (let k = 0; k <= LAYERS; k++) {
+    const u = k === 0 ? -1 : (t - start(k)) / DUR;
+    const change = smooth((u - 0.3) / 0.4);            // the change happens inside the layer
+    for (let s = 0; s < SLOTS; s++) {
+      const here = k === 0 ? shown : (u >= 1 ? 1 : 0);
+      draw(rest[k][s], S, slotX(s), rowY(k), level(k), here, kept(s));
+      if (k === 0) continue;
+      draw(move[k][s], S, slotX(s), lerp(rowY(k - 1), rowY(k), u), lerp(level(k - 1), level(k), change), u >= 0 && u < 1 ? 1 : 0, kept(s));
+    }
+  }
+}
+
+// Joint training. Once the features are down, a bracket to the right of the stack holds all its
+// layers together, and names and states the hypothesis (from NAMED). When that has been read,
+// and a moment more (PAUSE), the boundary sways in every layer at once: first the low-level side
+// gains, then the high-level side, and there it stays until Abstraction Fusion takes over. The
+// features that are out follow it, and the two words under the stack grow and shrink with it.
+const NAMED = END + 0.4, PAUSE = 1;
+const SWAY = [
+  { to: 0.75, from: NAMED + READ + PAUSE, dur: 1.6 },
+  { to: 0.25, from: NAMED + READ + PAUSE + 4.2, dur: 2.4 },
+];
+const SWAY_END = NAMED + READ + PAUSE + 6.6;
+const bottleneck = el('g', { opacity: 0 }, jointSide);
+const HOLD_X = LB + W + 22, MID_Y = (layerTop(1) + layerTop(LAYERS) + LAYER_H) / 2;
+el('path', { d: `M${HOLD_X - 8},${layerTop(1)} H${HOLD_X} V${layerTop(LAYERS) + LAYER_H} H${HOLD_X - 8}`, fill: 'none', stroke: INK, 'stroke-width': 1.5 }, bottleneck);
+label(bottleneck, HOLD_X + 18, MID_Y - 14, 'Propagation bottleneck hypothesis', { 'font-size': 22, 'font-weight': 500, 'text-anchor': 'start' });
+const bottleneckNote = [
+  ['Propagating ', ['low-level', KEY_LOW], ' features to deeper layers'],
+  ["can limit each layer's ", ['abstraction', KEY_HIGH], ' capacity.'],
+].map((parts, i) => line(bottleneck, HOLD_X + 18, MID_Y + 15 + i * 22, parts, { class: 'note', 'font-size': 16.5, fill: '#333' }));
+function renderJoint(t) {                            // t: seconds since the pass began
+  const share = shareAt(SWAY, 0.5, t);
+  jointStops.forEach(([gray, blue], i) => {
+    gray.setAttribute('offset', share - RAMP);
+    blue.setAttribute('offset', share + RAMP);
+    blue.setAttribute('stop-color', layerColor(depthLevel(i + 1) * (1 - share)));
+  });
+  weigh(conflictLow, share);
+  weigh(conflictHigh, 1 - share);
+  conflictLow.setAttribute('opacity', stepIn(t, WORDS_FROM));
+  conflictHigh.setAttribute('opacity', stepIn(t, WORDS_FROM));
+  // The sign between the words comes with the hypothesis, and is pushed towards the side that
+  // loses, as the boundary is.
+  conflictSign.setAttribute('opacity', clamp((t - NAMED) / 0.5));
+  conflictSign.setAttribute('transform', `translate(${(SIGN_X + 80 * (share - 0.5)).toFixed(2)},${TEXT_Y - SIGN_UP})`);
+  pass(jointRows, t, (k) => k * (1 - share), (s) => keptAt(share, s));
+  bottleneck.setAttribute('opacity', clamp((t - NAMED) / 0.5));
+  bottleneckNote.forEach((line) => line.setAttribute('opacity', noteAt(t - NAMED)));
+}
+
+// Abstraction Fusion. Once the features are down, the text comes in and the read-out path is
+// drawn. Then it reads one feature from every row, all at the same moment: each goes out along
+// its tap, down the bus and along the arrow, all at one speed and without stopping, so that they
+// go down the bus as a column and the one from the last row, which has the shortest way, arrives
+// first. The fused feature is built from them piece by piece in the order they arrive: it starts
+// as the first, the high-level one, and grows by one piece each time the next arrives and is
+// taken in, until it runs from high-level at one end to low-level at the other.
+// To the right of the read-out path, where the hypothesis stood: what Abstraction Fusion does.
+label(fusing, BUS + 22, MID_Y - 14, 'Abstraction Fusion', { 'font-size': 22, 'font-weight': 500, 'text-anchor': 'start' });
+const fusingNote = [
+  ['Fusing features across the frozen encoder hierarchy'],
+  ['keeps ', ['low-level', KEY_LOW], ' detail without limiting ', ['abstraction', KEY_HIGH], '.'],
+].map((parts, i) => line(fusing, BUS + 22, MID_Y + 15 + i * 22, parts, { class: 'note', 'font-size': 16.5, fill: '#333' }));
+const readLayer = el('g', {}, fusionSide);
+const readOut = pool(readLayer, LAYERS + 1, S);
+// The fused feature: one piece, colored like the features it is made of from end to end. The
+// colors are fixed in place, so that as the piece grows longer it shows more of them.
+const FUSED_LEFT = fusedX(0) - S / 2;
+const blend = el('linearGradient', { id: 'blend', gradientUnits: 'userSpaceOnUse', x1: FUSED_LEFT, x2: fusedX(LAYERS) + S / 2, y1: 0, y2: 0 }, defs);
+const placeOf = (k) => LAYERS - k;                   // the piece from row k: the last row's is first in the fused feature
+for (let p = 0; p <= LAYERS; p++) el('stop', { offset: (p * MERGED + S / 2) / (LAYERS * MERGED + S), 'stop-color': featureColor(LAYERS - p) }, blend);
+const fusedOne = el('rect', { x: FUSED_LEFT, y: FUSED_Y - S / 2, width: S, height: S, rx: S / 2, fill: 'url(#blend)', opacity: 0 }, readLayer);
+// The text comes first (from FUSING_FROM); the path is drawn when it has been read.
+const FUSING_FROM = END + 0.2, FUSING_DUR = 0.7, WIRES_FROM = FUSING_FROM + READ, WIRES_DUR = 1.5;
+const READ_FROM = WIRES_FROM + WIRES_DUR + 0.3;
+// The way of the feature read from row k: out along the tap, down the bus, along the arrow to its
+// place in the fused feature. ways(k) gives the lengths of the three parts.
+const ways = (k) => [BUS - slotX(SLOTS - 1), FUSED_Y - rowY(k), BUS - fusedX(placeOf(k))];
+const wayLength = (k) => ways(k).reduce((a, b) => a + b);
+function onWay(k, gone) {                            // where it is after `gone` of its way
+  const [tap, bus] = ways(k);
+  if (gone <= tap) return [slotX(SLOTS - 1) + gone, rowY(k)];
+  if (gone <= tap + bus) return [BUS, rowY(k) + gone - tap];
+  return [BUS - (gone - tap - bus), FUSED_Y];
+}
+// All set off at READ_FROM and go at FLOW (per second), so each arrives when its way is done. It
+// is taken in over JOIN seconds around its arrival.
+const FLOW = 240, JOIN = 0.26;
+const arrives = (k) => READ_FROM + wayLength(k) / FLOW;
+const FUSED = arrives(0) + JOIN;                     // the top row's has the longest way and arrives last
+function renderFusion(t) {                           // t: seconds since the pass began
+  pass(fusionRows, t, (k) => k, () => 0);
+  fusionHigh.setAttribute('opacity', stepIn(t, WORDS_FROM));
+  fusing.setAttribute('opacity', clamp((t - FUSING_FROM) / FUSING_DUR));
+  fusingNote.forEach((line) => line.setAttribute('opacity', noteAt(t - FUSING_FROM)));
+  drawWires(clamp((t - WIRES_FROM) / WIRES_DUR));
+  // The fused feature appears as the first feature arrives, and is one piece longer for every
+  // further feature it has taken in. A feature fades as it is taken in.
+  let pieces = 0;
+  const gone = (t - READ_FROM) * FLOW;               // how far each has gone; negative before they set off
+  readOut.forEach((node, k) => {
+    const joined = smooth((t - arrives(k)) / JOIN + 0.4);
+    if (placeOf(k) === 0) fusedOne.setAttribute('opacity', joined); else pieces += joined;
+    const [x, y] = onWay(k, Math.min(Math.max(gone, 0), wayLength(k)));
+    draw(node, S, x, y, k, gone >= 0 ? 1 - joined : 0);
+  });
+  fusedOne.setAttribute('width', S + MERGED * pieces);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scene 1: one layer, large, in the middle of the canvas.
+// ---------------------------------------------------------------------------------------------
+const one = el('g', {}, svg);
+const oneFeatures = el('g', {}, one), oneLayer = el('g', {}, one), oneText = el('g', {}, one);
+const A = { X: 160, Y: 194, W: 440, H: 76, S: 22, CORNER: 14, IN_Y: 170, OUT_Y: 292 };
+const aSlotX = (s) => A.X + A.W * (s + 0.5) / SLOTS;
+
+// The scene opens on the title and the layer alone. When the line under the title has been read,
+// the rest comes in together (WAIT seconds before DROP): the row of features above the layer,
+// with its label, and the semantic objective. Features go through the layer once, through the
+// semantic encoder (from DROP, over PASS seconds). The row then stays below the layer, and what
+// it holds follows the boundary as the two objectives pull on it.
+const WAIT = 1.6, DROP = READ + WAIT, PASS = 2.0;
+// Then the title changes to the joint encoder (from RENAMED: the old one goes, then the new one
+// comes). Here, and only here, the motion does not wait for the line under the title to be read:
+// the boundary starts to move at the moment that line starts to come. The share of the layer
+// that the reconstruction objective holds starts at 0 and moves three times. It goes back to the
+// middle only while the view zooms out.
+const RENAMED = DROP + PASS + 1.1, RENAME_HALF = 0.5, ADDED = RENAMED + RENAME_HALF + NOTE_LATE;
+const MOVES = [
+  { to: 0.5,  from: ADDED,       dur: 2.0 },        // reconstruction is added
+  { to: 0.75, from: ADDED + 4.2, dur: 1.4 },        // the reconstruction objective is the stronger one
+  { to: 0.25, from: ADDED + 9.2, dur: 2.0 },        // the semantic objective is the stronger one
+];
+const SCENE_END = ADDED + 14.8;                      // the last move is over and its words have been read
+const TURN = 0.6;                                    // the time the words on the layer take to go, and to come
+const levelAt = (share) => 0.3 + 4.5 * (1 - share);  // how abstract the abstracted features come out
+// The layer has the colors of the last layer of scene 2. All of it abstracting, it has the color
+// of that layer under Abstraction Fusion, the full blue; with half of it left for abstraction,
+// the color of that layer under joint training. So the abstracting side is deepest for the
+// semantic encoder and gets paler as the reconstruction side grows. depth: how blue the layer of
+// scene 2 whose colors it has is (depthLevel).
+const abstractColor = (share, depth) => layerColor(depth * (1 - share));
+
+// A title, and under it one line on what that encoder does with low-level features (what: the
+// parts of the line, the two key words set apart as in the lines of scene 2).
+function heading(title, what) {
+  const g = el('g', {}, oneText);
+  label(g, A.X + A.W / 2, 94, title, { 'font-size': 23 });
+  const note = line(g, A.X + A.W / 2, 119, what, { class: 'note', 'font-size': 19, fill: '#333', 'text-anchor': 'middle' });
+  return { g, note };
+}
+const titleBefore = heading('Semantic encoder', [['abstracts', KEY_HIGH], ' low-level features into high-level semantics']);
+const titleAfter = heading('Joint encoder', ['both ', ['abstracts', KEY_HIGH], ' and ', ['preserves', KEY_LOW], ' low-level features']);
+// Shown only while a row of features is waiting above the layer.
+const inputLabel = label(oneText, A.X + A.W / 2, 148, 'low-level features', { 'font-size': 15, fill: '#444', opacity: 0 });
+const row = pool(oneFeatures, SLOTS, A.S);
+
+const sides = el('linearGradient', { id: 'sides', x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+const stopGray = el('stop', { offset: 0, 'stop-color': layerColor(0) }, sides);
+const stopBlue = el('stop', { offset: 0 }, sides);
+const oneBody = el('rect', { x: A.X, y: A.Y, width: A.W, height: A.H, rx: A.CORNER, fill: 'url(#sides)', opacity: LAYER_ALPHA }, oneLayer);
+const oneName = label(oneLayer, A.X + A.W / 2, A.Y + A.H / 2 + 7, 'ViT Layer', { 'font-size': 21 });
+
+// The two objectives, below the layer. Each holds the part of the layer above its bracket, and
+// under its name is what it wants.
+const BRACKET_Y = A.Y + A.H + 60;
+function objective(name, wants) {
+  const g = el('g', {}, oneText);
+  const bracket = el('path', { fill: 'none', stroke: INK, 'stroke-width': 1.5 }, g);
+  const title = label(g, 0, BRACKET_Y + 26, name, {});
+  const sub = label(g, 0, BRACKET_Y + 45, wants, { 'font-size': 14, fill: '#666' });
+  return { g, bracket, title, sub };
+}
+const recon = objective('Reconstruction objective', 'keep low-level detail');
+const sem = objective('Semantic objective', 'abstract to high-level');
+function place(obj, x1, x2, strength, alpha) {
+  obj.g.setAttribute('opacity', alpha);
+  if (alpha <= 0) return;
+  obj.bracket.setAttribute('d', `M${x1},${BRACKET_Y - 8} V${BRACKET_Y} H${x2} V${BRACKET_Y - 8}`);
+  const cx = (x1 + x2) / 2;
+  obj.title.setAttribute('x', cx);
+  obj.sub.setAttribute('x', cx);
+  obj.title.setAttribute('font-size', 14 + 5 * strength);   // the stronger objective is set larger
+  obj.title.setAttribute('font-weight', 400 + Math.round(300 * strength));
+}
+
+// On the layer itself, on the line of its name: what each side gives. The two words come when
+// the layer first has two sides; once one objective has become the stronger, each has an arrow
+// beside it: up and blue for more of it, down and red for less. The arrows are drawn, not typed
+// (see the sign of scene 2). The words are over the layer but belong to the text of the scene,
+// which goes when the view zooms out. The name stays in the middle of the layer; each word
+// stands in the middle of the room its side has left beside the name (NAME_ROOM: half the room
+// the name takes).
+const TREND_Y = A.Y + A.H / 2 + 5, NAME_ROOM = 56;
+// lines: the words, on one line or on two. One line stands on the line of the name; two stand
+// just above and below it, each centred on the other, with the arrow beside the pair.
+function trend(lines) {
+  const g = el('g', { opacity: 0 }, oneText);
+  const texts = lines.map((words, i) => label(g, 0, TREND_Y + (i - (lines.length - 1) / 2) * 18, words, { 'font-size': 15, fill: '#333' }));
+  const arrow = el('path', { d: 'M0,6.5 V-6.5 M-4.2,-2.3 L0,-6.5 L4.2,-2.3', fill: 'none', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+  return { g, texts, arrow };
+}
+const trendLow = trend(['low-level', 'propagation']), trendHigh = trend(['abstraction']);
+// Where the words stand when the boundary is at rest with a given share: in the middle of the
+// room their side has left beside the name, and, for the side that has grown past half the
+// layer, leaning towards the middle of the layer by up to LEAN when it has three quarters: far
+// enough to be seen to move with it, not so far as to reach the name.
+const MIDDLE_X = A.X + A.W / 2, LEAN = 22;
+const lowRest = (share) => (A.X + Math.min(A.X + A.W * share, MIDDLE_X - NAME_ROOM)) / 2 + LEAN * Math.max(0, share - 0.5) / 0.25;
+const highRest = (share) => (Math.max(A.X + A.W * share, MIDDLE_X + NAME_ROOM) + A.X + A.W) / 2 + LEAN * Math.min(0, share - 0.5) / 0.25;
+// The boundary rests at a quarter, a half and three quarters. Between those the words go along
+// one smooth curve through their three places (a parabola in the share), so that they move for as
+// long as the boundary moves and do not stop on the way.
+function between(rest, share) {
+  const [a, b, c] = [0.25, 0.5, 0.75].map(rest), u = (share - 0.5) / 0.25;
+  return b + u * (c - a) / 2 + u * u * (a + c - 2 * b) / 2;
+}
+// cx: the middle of the room it has; way: 1 for an arrow up, -1 for one down; shown: how visible
+// the words are; armed: how visible the arrow is; strength: its side's share of the layer. The
+// words are set a very little larger as their side grows and smaller as it shrinks.
+function point({ g, texts, arrow }, cx, way, shown, armed, strength) {
+  g.setAttribute('opacity', shown);
+  texts.forEach((text) => text.setAttribute('font-size', 15 + 5 * (strength - 0.5)));
+  const GAP = 11, HEAD = 4.2, wide = Math.max(...texts.map((text) => text.getComputedTextLength()));
+  // The words and the place of their arrow are centred together, whether the arrow is there or
+  // not: the words do not move aside when it comes.
+  const mid = cx - (GAP + HEAD) / 2;
+  texts.forEach((text) => text.setAttribute('x', mid));
+  arrow.setAttribute('opacity', armed);
+  arrow.setAttribute('transform', `translate(${(mid + wide / 2 + GAP).toFixed(2)},${TREND_Y - 5}) scale(1,${way || 1})`);
+  arrow.setAttribute('stroke', way > 0 ? BLUE : RED);
+}
+
+// The layer of scene 2 that the layer of this scene shrinks into.
+const LAND = 3;
+// landing: 0 during this scene, 1 when the layer has shrunk into its place in scene 2. On the way
+// its boundary goes to the middle and widens to the passage from gray to blue of the layers
+// there, and its colors go from those of the last layer to those of layer LAND.
+function renderOne(t, landing) {
+  const share = lerp(shareAt(MOVES, 0, t), 0.5, landing), edge = A.X + A.W * share;
+  const blur = lerp(0.035, RAMP, landing) * clamp(share / 0.08);   // no gray edge while the layer only abstracts
+  stopGray.setAttribute('offset', share - blur);
+  stopBlue.setAttribute('offset', share + blur);
+  stopBlue.setAttribute('stop-color', abstractColor(share, lerp(depthLevel(LAYERS), depthLevel(LAND), landing)));
+  const alpha = clamp((t - DROP + WAIT) / 0.35);     // what comes in after the title and the layer
+  place(recon, A.X, edge - 7, share, clamp(share / 0.15));
+  place(sem, edge + 7 * clamp(share / 0.05), A.X + A.W, 1 - share, alpha);
+  // The words on the layer come as the layer first has two sides (the end of the first move) and
+  // then stay: when the boundary moves they move with the room they have. Only their arrows are
+  // away while it moves: they go as a move starts and come back, turned, as it comes to a stop.
+  // After the first move the two sides are even and there are no arrows; after the second,
+  // reconstruction is the stronger (more low-level, less abstraction); after the third, semantics.
+  const moving = Math.max(...MOVES.map((m) => Math.min(smooth((t - m.from) / TURN), 1 - smooth((t - (m.from + m.dur - TURN / 2)) / TURN))));
+  const made = MOVES.filter((m) => t > m.from + m.dur / 2).length;
+  const shown = smooth((t - (MOVES[0].from + MOVES[0].dur - TURN / 2)) / TURN);
+  const lowWay = [0, 0, 1, -1][made], armed = lowWay ? 1 - moving : 0;
+  point(trendLow, between(lowRest, share), lowWay, shown, armed, share);
+  point(trendHigh, between(highRest, share), -lowWay, shown, armed, 1 - share);
+
+  // The title changes before reconstruction is added: the old one goes, then the new one comes,
+  // and its line after it.
+  const renaming = (t - RENAMED) / RENAME_HALF;
+  titleBefore.g.setAttribute('opacity', 1 - smooth(renaming));
+  titleBefore.note.setAttribute('opacity', noteAt(t));
+  titleAfter.g.setAttribute('opacity', smooth(renaming - 1));
+  titleAfter.note.setAttribute('opacity', noteAt(t - RENAMED - RENAME_HALF));
+
+  // The row appears above the layer, waits, goes through, and stays below for good. From then on
+  // what it holds follows the boundary: no further rows are sent.
+  const u = (t - DROP) / PASS;
+  const change = smooth((u - 0.38) / 0.24);          // the change happens inside the layer
+  // Above the layer every feature is still low-level (kept); inside it, those on the abstracting side change.
+  const featureY = lerp(A.IN_Y, A.OUT_Y, smooth(u));
+  row.forEach((node, s) => draw(node, A.S, aSlotX(s), featureY, levelAt(share), alpha, 1 - change * (1 - keptAt(share, s))));
+  // The label belongs to the features above the layer: it goes down with them and fades as they go in.
+  inputLabel.setAttribute('y', 148 + featureY - A.IN_Y);
+  inputLabel.setAttribute('opacity', alpha * (1 - smooth(u / 0.3)));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The whole animation: scene 1, the zoom out, scene 2.
+// ---------------------------------------------------------------------------------------------
+const ZOOM_FROM = SCENE_END, ZOOM_DUR = 1.8;        // scene 1 ends with the semantic objective the stronger one
+// The zoom ends on the joint-training stack. The features go through it and the boundary sways.
+// Then Abstraction Fusion takes its place, and the features go through that.
+const JOINT_FROM = ZOOM_FROM + ZOOM_DUR + 0.3;
+const FUSION_FROM = JOINT_FROM + SWAY_END + 3.4, FUSION_DUR = 0.8;
+const FUSION_PASS = FUSION_FROM + FUSION_DUR - 0.3;
+// The animation plays once. It ends a moment after the fused feature is complete, and stays on
+// that picture.
+const LENGTH = FUSION_PASS + FUSED + 0.6;
+// The large layer lands exactly on layer LAND of the joint-training stack, and by then looks
+// exactly like it: the same colors, passage from gray to blue, corners and name.
+const K_END = W / A.W, TX_END = LB - K_END * A.X, TY_END = layerTop(LAND) - K_END * A.Y;
+
+function render(time) {
+  const t = Math.max(0, Math.min(time, LENGTH));
+  svg.style.opacity = clamp(t / 0.4);
+
+  const z = (t - ZOOM_FROM) / ZOOM_DUR, e = smooth(z);
+  renderOne(Math.min(t, ZOOM_FROM), e);
+  one.setAttribute('transform', `translate(${(TX_END * e).toFixed(2)},${(TY_END * e).toFixed(2)}) scale(${lerp(1, K_END, e).toFixed(4)})`);
+  // The layer's name and corners shrink less than the layer, so that they land at the stack's size.
+  oneName.setAttribute('font-size', lerp(21, 17 / K_END, e));
+  oneName.setAttribute('y', A.Y + lerp(A.H / 2 + 7, 26 / K_END, e));
+  oneBody.setAttribute('rx', lerp(A.CORNER, 6 / K_END, e));
+  // The text and the features of scene 1 go first; its layer stays until it has landed.
+  const gone = 1 - clamp(z / 0.3);
+  oneText.setAttribute('opacity', gone);
+  oneFeatures.setAttribute('opacity', gone);
+  const landed = z >= 1 ? 1 : 0;                     // the stack's own layer then stands in its place
+  oneLayer.setAttribute('opacity', 1 - landed);
+
+  full.setAttribute('opacity', clamp((z - 0.45) / 0.5));
+  // Abstraction Fusion takes the place of joint training: one goes, then the other comes.
+  const swap = (t - FUSION_FROM) / FUSION_DUR;
+  jointSide.setAttribute('opacity', 1 - clamp(swap * 2));
+  fusionSide.setAttribute('opacity', clamp(swap * 2 - 1));
+  renderJoint(Math.max(0, t - JOINT_FROM));
+  renderFusion(Math.max(0, t - FUSION_PASS));
+  // The place of layer LAND is kept free for the layer that is on its way.
+  const kept = jointLayers[LAND - 1];
+  kept.body.setAttribute('opacity', LAYER_ALPHA * landed);
+  kept.name.setAttribute('opacity', landed);
+}
+
+// All times above are on the animation's own clock, which runs SPEED times as fast as real time.
+const SPEED = 2;
+// The clock runs while the reader has the animation playing, the figure is on screen, and the
+// timeline is not being dragged. Otherwise it stands still, and goes on from where it stood:
+// it never jumps unless the reader moves the timeline. At the end it stops, paused on the last
+// picture; it does not start again by itself.
+const toggle = document.getElementById('toggle'), toggleIcon = document.getElementById('toggleIcon');
+const timeline = document.getElementById('timeline');
+timeline.max = LENGTH;
+let clock = 0, last = null, loop = 0;
+let playing = true, onScreen = false, dragging = false, held = false;
+function show() {
+  render(clock);
+  timeline.value = clock;
+}
+function frame(now) {
+  if (last !== null) clock += (now - last) / 1000 * SPEED;
+  last = now;
+  if (clock >= LENGTH) {
+    clock = LENGTH;
+    show();
+    playing = false;
+    update();
+    return;
+  }
+  show();
+  loop = requestAnimationFrame(frame);
+}
+function update() {
+  const run = playing && onScreen && !dragging && !held;
+  if (run && !loop) { last = null; loop = requestAnimationFrame(frame); }
+  if (!run && loop) { cancelAnimationFrame(loop); loop = 0; }
+  document.body.classList.toggle('paused', !playing);
+  toggle.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  toggleIcon.setAttribute('d', playing ? 'M3.5,2.5 h3 v11 h-3 z M9.5,2.5 h3 v11 h-3 z' : 'M4,2 L14,8 L4,14 z');
+}
+// The button, or a click on the picture itself, plays and pauses. Playing from the end starts
+// over from the beginning.
+function flip() {
+  if (!playing && clock >= LENGTH) clock = 0;
+  playing = !playing;
+  update();
+}
+// A button clicked with the pointer does not keep the keyboard focus: otherwise the next Space or
+// Enter, pressed for something else, would press it again, and at the end that starts it over.
+// (A click made from the keyboard has detail 0, and leaves the focus where it is.)
+toggle.addEventListener('click', (event) => { flip(); if (event.detail) toggle.blur(); });
+svg.addEventListener('click', flip);
+// The timeline: moving it pauses the animation, and the picture follows it. It stays paused at
+// the place it was moved to until the reader plays it again.
+timeline.addEventListener('pointerdown', () => { dragging = true; playing = false; update(); });
+timeline.addEventListener('input', () => { playing = false; clock = +timeline.value; render(clock); update(); });
+['pointerup', 'pointercancel'].forEach((type) => window.addEventListener(type, () => { dragging = false; update(); }));
+// On screen: at least half of the picture is in view. Several changes can be reported at once;
+// the last is the current one.
+new IntersectionObserver((entries) => { onScreen = entries[entries.length - 1].intersectionRatio >= 0.5; update(); }, { threshold: 0.5 }).observe(svg);
+
+// For rendering single frames: seek(t), or ?t= in the address, shows time t and holds it.
+window.seek = function (t) { held = true; update(); render(t); };
+const at = new URLSearchParams(location.search).get('t');
+show();
+update();
+if (at !== null) window.seek(parseFloat(at));
+</script>
+</body>
+</html>

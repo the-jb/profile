@@ -1,0 +1,379 @@
+/* Colors follow thejb.ai: near-black text on white, one blue for links and emphasis. The typeface
+   is Google Sans, loaded from Google Fonts in index.html, with thejb.ai's system stack behind it. */
+:root {
+  color-scheme: light;
+  --ink: #1d1d1f;
+  --soft: #333;
+  --muted: #666;
+  --faint: #999;
+  --line: #eee;
+  --accent: #0954c9;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* The width at which one chart of the paper is shown, at most. Figures of one, two or three
+     charts take their widths from it, so a chart has about the same size in each; on a narrow
+     screen a chart is never wider than half the text column. */
+  --chart: 340px;
+  --half-column: calc((100vw - 40px) / 2);
+  /* How wide a figure's caption may be: a little less than the text column (800px), whatever the
+     width of the figure. */
+  --caption: 760px;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  font-family: "Google Sans", -apple-system, "system-ui", "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 16.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink);
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+body { margin: 0; }
+
+img, svg { display: block; max-width: 100%; }
+
+a, a:visited { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+strong, b { font-weight: 550; }
+
+/* The name Integral, wherever it appears. Young Serif has one weight, so it is never bolded. */
+.name { font-family: "Young Serif", Georgia, serif; font-weight: 400; font-style: normal; letter-spacing: 0; }
+sup { font-size: 0.67em; line-height: 0; }
+::selection { color: var(--ink); background: var(--line); }
+
+/* Text column: 800px of content plus the side padding. Multi-panel figures, the examples and the
+   comparison use the wide column. */
+.col { max-width: 840px; margin: 0 auto; padding: 0 20px; }
+.col.wide { max-width: 980px; }
+
+/* Google Sans is set tighter than the system fonts, so headings get less negative tracking than
+   thejb.ai's -0.03em. */
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em; }
+h1 { font-size: 2em; text-wrap: balance; }
+h2 { font-size: 1.5em; margin-bottom: 0.7em; }
+h3 { font-size: 1.2em; margin: 2em 0 0.4em; letter-spacing: -0.01em; }
+p { margin: 0.8em 0; }
+
+figure { margin: 0; }
+figcaption, .caption { font-size: 0.85em; color: var(--muted); }
+.center { text-align: center; }
+
+math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", "DejaVu Math TeX Gyre", math; }
+math[display="block"] { margin: 1em 0; font-size: 1.1em; }
+
+/* The mark of thejb.ai, small and centered above the name at the top of the page; it links there.
+   It sits partly in the hero's top padding, so the title moves down by 34px only. */
+.home { display: block; width: 40px; height: 40px; margin: -24px auto 18px; }
+.home img { width: 100%; height: 100%; }
+
+/* Hero */
+.hero { padding: 3.6em 0 3.2em; text-align: center; }
+.brand { margin: 0 0 0.3em; font-size: 1.5em; line-height: 1.2; }
+.authors { margin: 1.5em 0 0.3em; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.1em 1.1em; }
+.authors span { white-space: nowrap; }
+.affiliations { margin: 0.3em 0; color: var(--soft); }
+.notes { margin: 0.3em 0; font-size: 0.8em; color: var(--muted); }
+
+.links { margin: 1.4em 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.2em 1.4em; font-weight: 550; }
+.links.left { justify-content: flex-start; margin-top: 0; }
+.soon { color: var(--faint); }
+.soon::after { content: " (soon)"; font-weight: 400; font-size: 0.85em; }
+
+/* The claim the page is about, then the core idea in two sentences. */
+.claim { margin: 2.2em auto 0; max-width: 700px; font-size: 1.4em; line-height: 1.3; font-weight: 550; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0.9em auto 0; max-width: 700px; color: var(--soft); font-style: italic; text-wrap: pretty; }
+/* The lede under the samples: more room above it than under the question, and under it before
+   the overview figure. */
+.col.wide + .col .lede { margin-top: 3.2em; }
+.lede + .fig { margin-top: 2.8em; }
+
+/* Selected results: four equal tiles. The editing pair takes two of them, with its arrow set on
+   the seam between the input and the output. */
+.showcase { margin-top: 2.4em; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: start; text-align: left; }
+.showcase .double { grid-column: span 2; }
+.showcase img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+.showcase figcaption { margin-top: 0.6em; line-height: 1.4; }
+.showcase figcaption b { display: block; color: var(--ink); }
+.pair { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair .arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2em;
+  height: 2em;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: #fff;
+  border-radius: 50%;
+}
+.arrow { color: var(--faint); font-size: 1.1em; }
+
+/* Sections. The rule between them is as wide as the text column, not the window. */
+section { padding: 0 0 3.4em; }
+section::before, .part::before {
+  content: "";
+  display: block;
+  width: calc(100% - 40px);
+  max-width: 800px;
+  margin: 0 auto 3.4em;
+  border-top: 1px solid var(--line);
+}
+section:last-child { padding-bottom: 5em; }
+
+/* The two parts of the story. A part heading carries the rule, so the section after it has none. */
+.part { padding-bottom: 2.8em; text-align: center; }
+.part + section::before { display: none; }
+.part-label { margin: 0; font-size: 0.8em; font-weight: 550; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.part-title { margin: 0.25em 0 0; padding: 0 20px; font-size: 1.8em; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
+
+/* What a section is in the argument: the hypothesis, an observation, the design, ... */
+.eyebrow { margin: 0 0 0.35em; font-size: 0.8em; font-weight: 550; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+
+/* A hypothesis, a design principle or a conclusion, set apart from the running text. */
+.statement {
+  margin: 1.2em 0;
+  padding: 0.15em 0 0.15em 1.1em;
+  border-left: 2px solid var(--ink);
+  font-size: 1.08em;
+  font-style: italic;
+  text-wrap: pretty;
+}
+
+/* Figures from the paper. A single figure is centered in the text column. Its box is as wide as
+   its caption may be (--caption); what it shows is centered in that box at the figure's own
+   width, --w, so a caption can be wider than a small figure. A row of panels sits in the wide
+   column. */
+.fig { margin: 1.8em auto; max-width: var(--caption); --w: 100%; }
+.fig > img, .fig > svg { display: block; width: 100%; max-width: var(--w); margin: 0 auto; }
+/* One chart: the chart itself is --chart wide, or half the column on a narrow screen (the size of
+   a chart in a row of two there). */
+.fig.one-chart { --w: min(var(--chart), var(--half-column)); }
+/* One image that holds two charts side by side. */
+.fig.two-charts { --w: calc(2 * var(--chart) + 2.2em); }
+.fig.s { --w: 440px; }
+.fig.m { --w: 520px; }
+.fig.l { --w: 760px; }
+/* An animated figure is a page of its own in a frame. The box has the shape of the canvas; the
+   frame is taller than the box by the bar of controls that the animation has under its canvas.
+   The box is 640px wide at most, centered. */
+.fig .anim-box { position: relative; aspect-ratio: 760 / 500; max-width: 640px; margin: 0 auto 40px; }
+.fig iframe.anim { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% + 40px); border: 0; }
+/* The overview in motion: the shape and the width of the overview figure. */
+.fig .anim-box.overview { aspect-ratio: 561 / 282; max-width: 520px; }
+.fig figcaption { margin-top: 0.8em; text-align: center; text-wrap: balance; }
+.hero .fig { margin-bottom: 0; }
+
+.panels { margin: 1.8em auto; display: grid; gap: 1em 2.2em; align-items: end; }
+.panels.two { max-width: calc(2 * var(--chart) + 2.2em); grid-template-columns: 1fr 1fr; }
+.panels.three { grid-template-columns: repeat(3, 1fr); }
+/* The first panel holds the two diagrams side by side. Columns follow the figures' aspect ratios,
+   so the diagrams and the two plots are one height. */
+.panels.mot { grid-template-columns: 1fr 0.72fr 0.72fr; }
+.panels .both { align-self: end; display: grid; grid-template-columns: 1fr 1fr; column-gap: 6%; }
+/* A panel is an image and its label, on two rows that all panels of the figure share: the images
+   stand on one line and the labels start on one line, whether a label takes one line or two. */
+.panels > div { grid-row: span 2; display: grid; grid-template-rows: subgrid; row-gap: 0; }
+.panels img { width: 100%; align-self: end; }
+.panels p { margin: 0.4em 0 0; text-align: center; font-size: 0.85em; color: var(--soft); align-self: start; }
+.panels figcaption { grid-column: 1 / -1; max-width: var(--caption); justify-self: center; text-align: center; text-wrap: balance; }
+
+/* Separate vs. shared representations */
+.reps { max-width: 840px; margin: 2.2em auto 1.8em; display: grid; grid-template-columns: 395fr 360fr; gap: 1.6em 2.2em; }
+.reps figcaption { grid-column: 1 / -1; max-width: var(--caption); justify-self: center; text-align: center; text-wrap: balance; }
+/* a dotted rule in the middle of the gap between the two sides */
+.rep { position: relative; }
+.rep + .rep::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1.1em; border-left: 1.5px dotted #bbb; }
+.rep h4 { margin-bottom: 1.1em; font-size: 0.95em; font-weight: 550; letter-spacing: -0.01em; text-align: center; }
+/* Each side is a drawing; sizes are in its own units (395 and 360 wide). Blue is the VLM's visual
+   representation, red the VAE latents, as in the GenEval charts (AF blue, FLUX.1-VAE red). */
+.rep svg { display: block; width: 100%; height: auto; }
+.rep .model { fill: #ececec; }
+.rep .model.dit { fill: #f8dcdc; }
+.rep .model-name { font-size: 15px; font-weight: 500; fill: var(--ink); text-anchor: middle; }
+.rep .label { font-size: 11.5px; fill: var(--ink); text-anchor: middle; }
+.rep .side { font-size: 10.5px; fill: var(--muted); text-anchor: middle; }
+.rep .span { fill: none; stroke: var(--faint); stroke-width: 1; }
+.rep .link { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 0.1 4.6; }
+.rep .link-head { fill: var(--ink); }
+.rep .vlm-rep { fill: var(--accent); }
+.rep .text-rep { fill: #7a7a7a; }
+.rep .vae-rep { fill: #d62728; }
+
+/* A chart from the paper with notes beside it: the chart on the left, and on the right what its
+   marks say, joined to them by dotted leaders. One drawing, 470 units wide; at full width one unit
+   is about 1.39px, so the chart (244.77 units) is --chart wide and the notes are 14px. */
+.fig.noted { --w: 653px; }
+.fig.noted svg { display: block; width: 100%; height: auto; }
+.noted .gain { fill: none; stroke: var(--ink); stroke-width: 1.1; }
+.noted .gain-head { fill: var(--ink); }
+.noted .lead { fill: none; stroke: var(--ink); stroke-width: 1.1; stroke-linecap: round; stroke-dasharray: 0.1 2.9; }
+.noted text { font-size: 10px; fill: var(--ink); }
+
+/* Examples: a carousel with two groups. A text-to-image slide shows two generated images, each
+   with its prompt; an editing slide shows one input -> output pair with its instruction. */
+.carousel { margin-top: 1.8em; }
+.carousel-tabs { margin-bottom: 1.6em; display: flex; justify-content: center; gap: 2.2em; }
+.carousel-tabs button {
+  padding: 0.25em 0;
+  font: inherit;
+  font-weight: 550;
+  color: var(--faint);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.carousel-tabs button:hover { color: var(--muted); }
+.carousel-tabs button.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+.slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.slides::-webkit-scrollbar { display: none; }
+.slides:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+.slide { flex: 0 0 100%; scroll-snap-align: start; }
+.duo { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 46px; align-items: start; }
+.duo img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+/* An editing pair uses the full width, and its caption sits directly under the images. The pairs
+   are mostly 3:2; the height cap keeps a square pair from being taller than the other slides. */
+.io { display: grid; grid-template-columns: 1fr 18px 1fr; align-items: center; gap: 14px; }
+.io .arrow { text-align: center; }
+.cell { display: flex; justify-content: center; }
+.cell img { width: auto; max-width: 100%; max-height: 360px; border-radius: 4px; }
+/* A pair of square images: narrower, so the images fill their cells and the caption lines up
+   with them (two 360px images plus the arrow column and its gaps). */
+.slide.square .io, .slide.square > figcaption { max-width: 766px; margin-left: auto; margin-right: auto; }
+.slide figcaption { margin-top: 1em; color: var(--soft); font-size: 0.92em; }
+.slide figcaption p { margin: 0.35em 0 0; }
+.slide figcaption b { display: block; font-size: 0.86em; color: var(--faint); }
+.kind { font-size: 0.86em; font-weight: 550; color: var(--accent); }
+/* A long benchmark instruction is shown as a summary, with the original text to open under it. */
+.slide details { margin-top: 0.35em; }
+.slide summary { font-size: 0.86em; color: var(--faint); cursor: pointer; }
+
+.carousel-nav { margin-top: 1.4em; display: flex; align-items: center; justify-content: center; gap: 1.2em; }
+.carousel-nav button {
+  width: 2.4em;
+  height: 2.4em;
+  font: inherit;
+  line-height: 1;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.carousel-nav button:hover:not(:disabled) { border-color: var(--ink); }
+.carousel-nav button:disabled { color: #ccc; border-color: var(--line); cursor: default; }
+.count { min-width: 4em; text-align: center; font-size: 0.85em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.carousel + .caption { margin: 1.4em 0 0; }
+
+/* Comparison with other unified models */
+/* Sizes are in viewBox units (760 wide), and the plot is shown at that width on desktop. */
+.chart { margin: 1.6em auto 0; max-width: 760px; }
+.chart svg { width: 100%; height: auto; font-size: 13px; }
+.chart .grid line { stroke: var(--line); }
+.chart .axis line { stroke: var(--faint); }
+.chart .ticks text { fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .axis-title { fill: var(--soft); font-size: 13.5px; }
+.chart .point circle { fill: var(--faint); stroke: #fff; stroke-width: 1.5; }
+.chart .point text { fill: var(--soft); }
+.chart .point tspan { fill: var(--faint); }
+.chart .ours circle { fill: var(--accent); }
+.chart .ours text { fill: var(--ink); font-weight: 700; font-size: 14px; }
+.chart .ours tspan { fill: var(--muted); font-weight: 400; }
+.chart .ours tspan.name { fill: var(--ink); }
+/* 20px wider than the chart on each side (the text column's width), so that the caption stays on
+   one line. */
+.chart figcaption { margin: 0.4em -20px 0; text-align: center; text-wrap: balance; }
+
+/* Tables */
+table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 0.45em 0.4em; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 550; color: var(--muted); }
+thead tr:last-child th, th[rowspan] { border-bottom-color: var(--faint); }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+td b { font-weight: 700; }
+/* The unified models of the paper's Table 3: fifteen columns, so it scrolls sideways when narrow. */
+.full-table { margin-top: 2.4em; overflow-x: auto; }
+.full-table table { width: 100%; font-size: 0.78em; }
+tr.ours td:first-child { font-weight: 700; }
+tr.ours td { border-bottom-color: var(--faint); border-top: 1px solid var(--faint); }
+.full-table + .caption { margin: 0.9em 0 1.6em; }
+/* The model names stay in view while the table scrolls sideways. */
+.full-table tbody td:first-child, .full-table thead tr:first-child th:first-child { position: sticky; left: 0; background: #fff; }
+/* A rule between the understanding columns and the generation columns (GenEval is the first). */
+.full-table th.group:last-child, .full-table thead tr:last-child th:nth-child(10), .full-table tbody td:nth-child(12) { border-left: 1px solid var(--faint); }
+
+/* What we learned */
+.learned { margin: 1.2em 0 0; padding-left: 1.4em; }
+.learned li { margin: 1.1em 0; padding-left: 0.3em; color: var(--soft); }
+.learned li::marker { font-weight: 700; color: var(--ink); }
+.learned b { display: block; font-size: 1.06em; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+
+/* BibTeX */
+.bibtex { position: relative; }
+.bibtex pre {
+  margin: 0;
+  padding: 1em 1.2em;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8em;
+  line-height: 1.6;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.copy {
+  position: absolute;
+  top: 0.6em;
+  right: 0.6em;
+  padding: 0.15em 0.8em;
+  font: inherit;
+  font-size: 0.78em;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.copy:hover { border-color: var(--faint); }
+
+@media (max-width: 820px) {
+  .reps { grid-template-columns: 1fr; }
+  .rep + .rep::before { display: none; }
+  /* stacked, the narrower drawing keeps the scale of the wider one */
+  .rep + .rep svg { width: calc(100% * 360 / 395); margin: 0 auto; }
+}
+
+@media (max-width: 640px) {
+  h1 { font-size: 1.55em; }
+  h2 { font-size: 1.3em; }
+  .hero { padding: 2.4em 0; }
+  .claim { font-size: 1.22em; }
+  .part-title { font-size: 1.4em; }
+  section { padding-bottom: 2.6em; }
+  section::before, .part::before { margin-bottom: 2.6em; }
+  .showcase { grid-template-columns: 1fr 1fr; }
+  /* Panels stay side by side as on a wide screen and only get smaller; less room between them.
+     The MoT figure goes on two rows: the panel of its two diagrams, then its two plots. */
+  .panels { gap: 0.8em 0.7em; }
+  .panels.mot { grid-template-columns: 1fr 1fr; row-gap: 1.4em; }
+  .panels.mot > div:first-child { grid-column: 1 / -1; }
+  .panels.mot .both { width: 84%; justify-self: center; }
+  .panels p { font-size: 0.72em; }
+  .duo { gap: 16px; }
+  .io { grid-template-columns: 1fr 16px 1fr; gap: 0; }
+  /* The plot's labels are too small at phone width, so it keeps a readable size and scrolls. */
+  .chart { overflow-x: auto; }
+  .chart figcaption { margin: 0.4em 0 0; }
+  .chart svg { min-width: 640px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
